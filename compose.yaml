@@ -1,0 +1,67 @@
+# Bannerlord Coop dedicated server
+#
+# Never invoked directly - `coop` passes the generated environment file and
+# the project name:
+#
+#   docker compose --env-file <install-dir>/config/compose.env \
+#                  -p bannerlordcoop-<instance> -f compose.yaml up -d
+#
+# Every value below comes from that generated file, which `coop` writes
+# from config/server.env. Editing this file by hand is supported; editing
+# compose.env is not, because it is regenerated.
+
+services:
+  server:
+    build:
+      context: ./docker
+      args:
+        PUID: ${COOP_PUID:?COOP_PUID is missing - run coop config --apply}
+        PGID: ${COOP_PGID:?COOP_PGID is missing}
+        WINE_BRANCH: ${COOP_WINE_BRANCH:-stable}
+    image: bannerlordcoop/server:${COOP_WINE_BRANCH:-stable}
+    container_name: ${COOP_CONTAINER_NAME:?COOP_CONTAINER_NAME is missing}
+    restart: unless-stopped
+
+    # The entrypoint traps SIGTERM and sends "stop" to the server console,
+    # then waits for the closing save. Docker must not lose patience before
+    # the entrypoint does: its own STOP_TIMEOUT is 150s.
+    stdin_open: true
+    stop_grace_period: 180s
+
+    environment:
+      TZ: ${COOP_TZ:-UTC}
+
+    # The only port that has to be reachable from the internet. The Steam
+    # game-server ports (UDP 27315/27316) are used locally only.
+    #
+    # Note: Docker publishes ports past ufw. See docs/INSTALLATION.md.
+    ports:
+      - "${COOP_GAME_PORT:-4200}:4200/udp"
+
+    volumes:
+      # Read-only on purpose. The server verifies its Coop assemblies with
+      # SHA-256 and refuses to start (exit 4) if they differ. What cannot
+      # be written cannot drift.
+      - ${COOP_INSTALL_DIR:?COOP_INSTALL_DIR is missing}/server:/server:ro
+
+      # The server's data directory, selected with --data-dir. Saves and
+      # logs are separate bind mounts inside it so the manager can back
+      # them up and rotate them independently.
+      - ${COOP_INSTALL_DIR}/config:/data
+      - ${COOP_INSTALL_DIR}/saves:/data/Game Saves
+      - ${COOP_INSTALL_DIR}/logs:/data/logs
+
+      # mod-config.json does NOT follow --data-dir. It follows Bannerlord's
+      # user folder inside the Wine prefix, so without this mount it would
+      # be lost on every container rebuild.
+      - ${COOP_INSTALL_DIR}/coopdata:/home/coop/.wine/drive_c/users/coop/Documents/Mount and Blade II Bannerlord/CoopData
+
+    # 0 means no limit. Measured usage is 1.2-1.6 GB; a limit protects the
+    # host - and with it, SSH - from a runaway process.
+    mem_limit: ${COOP_MEMORY_LIMIT:-0}
+
+    logging:
+      driver: json-file
+      options:
+        max-size: ${COOP_LOG_MAX_SIZE:-50m}
+        max-file: "${COOP_LOG_MAX_FILES:-5}"

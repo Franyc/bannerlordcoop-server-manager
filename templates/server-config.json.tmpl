@@ -1,0 +1,54 @@
+{
+  // Bannerlord Coop dedicated server configuration.
+  //
+  // GENERATED FILE - DO NOT EDIT.
+  // The manager rewrites it from config/server.env whenever a setting
+  // changes, and your edits here would be lost. Change a setting with:
+  //
+  //     coop config --set SAVE_NAME="My Campaign"
+  //     coop config
+  //
+  // The previous version is kept beside this file as server-config.json.bak.
+  //
+  // The format is JSONC: comments and trailing commas are allowed, which is
+  // also why it is generated rather than patched - a regular JSON parser
+  // cannot read it, and editing it with a regular expression is how a
+  // campaign gets lost.
+
+  // Campaign to host, taken from "Game Saves" beside this file. An existing
+  // save of this name is loaded; otherwise a fresh world is created and
+  // saved under it. The server keeps two previous generations of its own.
+  "saveName": "@@SAVE_NAME@@",
+
+  // Minutes between automatic world saves. 0 disables autosaving.
+  "autosaveMinutes": @@AUTOSAVE_MINUTES@@,
+
+  // Password players are asked for when joining. Empty means no password.
+  "password": "@@SERVER_PASSWORD@@",
+
+  // UDP port clients connect to. Players must enter this same port in the
+  // connect menu, and it has to be reachable from the internet.
+  "port": @@GAME_PORT@@,
+
+  // Write the server's output to logs/coop-server-*.log beside this file,
+  // one file per launch, in addition to the container log.
+  "logFile": @@SERVER_LOG_FILE@@,
+
+  // Advertise this server in a public Steam lobby, which requires a
+  // logged-in Steam client on the same machine. With no Steam client the
+  // server reports "Steam unavailable" and serves direct connections as
+  // usual. Leave this off unless a public lobby is what you want.
+  "steam": @@STEAM_ADVERTISE@@,
+
+  // Gameplay settings - campaign difficulty, world ageing and the rest -
+  // are not here. They live in mod-config.json in the CoopData folder, are
+  // owned by the Coop mod, and are created on first launch. The manager
+  // backs that file up and restores it after an update, but never writes it.
+
+  // Diagnostic tracing. Each of these produces thousands of lines per
+  // minute on a running campaign; turn one on only when capturing evidence
+  // for a bug report, and remember that this file is regenerated.
+  "traceTick": false,
+  "tracePublish": false,
+  "traceBandits": false,
+}

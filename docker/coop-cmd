@@ -1,0 +1,11 @@
+#!/bin/sh
+# Send a command to the console of the running server.
+#
+#   docker exec <container> coop-cmd save
+#   docker exec <container> coop-cmd players
+#
+# Accepted by the server: status players save say kick stop help
+[ $# -ge 1 ] || { echo "usage: coop-cmd <command> [args...]" >&2; exit 2; }
+FIFO="${COOP_FIFO:-/tmp/coop.cmd}"
+[ -p "$FIFO" ] || { echo "coop-cmd: server console not available ($FIFO)" >&2; exit 1; }
+printf '%s\n' "$*" > "$FIFO"
