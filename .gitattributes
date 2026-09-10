@@ -27,3 +27,8 @@ Dockerfile*   text eol=lf
 *.gz  binary
 *.zip binary
 *.sav binary
+
+# Scripts without a file extension
+bin/coop        text eol=lf
+docker/coop-cmd text eol=lf
+install.sh      text eol=lf
