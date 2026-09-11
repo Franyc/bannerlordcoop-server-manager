@@ -138,6 +138,10 @@ _validate_value() {
             (( ${#value} <= 512 )) || printf 'must be at most 512 characters'
             ;;
     esac
+    # A reason is reported by printing it, never by the exit status. Some
+    # branches above end on a test that is legitimately false for a valid
+    # value, and under `set -e` that would abort the caller.
+    return 0
 }
 
 config_validate_all() {

@@ -146,7 +146,8 @@ provision_run() {
 
     step "Writing the configuration"
     if [[ -f "$FILE_CONFIG" ]]; then
-        config_persist "$FILE_CONFIG" $(config_keys)
+        mapfile -t _all_keys < <(config_keys)
+        config_persist "$FILE_CONFIG" "${_all_keys[@]}"
     else
         config_write_new "$FILE_CONFIG"
     fi

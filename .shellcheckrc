@@ -1,0 +1,10 @@
+# The libraries in lib/ are sourced into a single process by bin/coop, so
+# ShellCheck's per-file view cannot see where a variable defined in one
+# file is used in another. SC2034 would therefore flag every shared
+# variable - exit codes, colours, derived paths - as unused, and the noise
+# would bury a real finding.
+disable=SC2034
+
+# bin/coop sources its libraries from a computed path, which ShellCheck
+# cannot follow. The syntax check in CI covers those files directly.
+disable=SC1091

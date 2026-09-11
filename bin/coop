@@ -373,7 +373,8 @@ cmd_config() {
             config_validate_all
             provision_summary
             confirm "Save these settings?" yes || { log "Nothing was changed."; return 0; }
-            config_persist "$FILE_CONFIG" $(config_keys)
+            mapfile -t _all_keys < <(config_keys)
+        config_persist "$FILE_CONFIG" "${_all_keys[@]}"
             _config_apply_after_change "" --force ;;
     esac
 }
