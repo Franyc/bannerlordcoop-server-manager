@@ -1,0 +1,129 @@
+name: lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+
+      - name: Check syntax
+        run: |
+          for f in bin/coop install.sh lib/*.sh docker/entrypoint.sh; do
+            bash -n "$f" || exit 1
+          done
+          sh -n docker/coop-cmd
+          sh -n docker/healthcheck.sh
+
+      - name: ShellCheck
+        run: |
+          shellcheck --shell=bash --severity=warning \
+            bin/coop install.sh lib/*.sh docker/entrypoint.sh
+          shellcheck --shell=sh --severity=warning \
+            docker/coop-cmd docker/healthcheck.sh
+
+  selfcheck:
+    name: Configuration self-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq
+
+      # Proves that config/defaults.env and the specification in
+      # lib/config.sh describe exactly the same set of settings. Without
+      # this the two drift apart silently and a new setting ends up with
+      # no default.
+      - name: defaults.env matches the spec
+        run: |
+          COOP_ROOT="$PWD" bash -c '
+            set -euo pipefail
+            COOP_ROOT="$PWD"
+            . lib/common.sh; . lib/output.sh; . lib/config.sh
+            config_selfcheck
+            echo "spec and defaults.env agree ($(config_keys | wc -l) settings)"
+          '
+
+      - name: Every setting has a valid default
+        run: |
+          COOP_ROOT="$PWD" bash -c '
+            set -euo pipefail
+            COOP_ROOT="$PWD"
+            . lib/common.sh; . lib/output.sh; . lib/config.sh
+            config_load
+            config_validate_all
+            echo "all defaults validate"
+          '
+
+      # The configuration file is parsed, never sourced. This proves it,
+      # so the guarantee cannot quietly regress.
+      - name: Configuration is never executed
+        run: |
+          COOP_ROOT="$PWD" bash -c '
+            set -euo pipefail
+            COOP_ROOT="$PWD"
+            . lib/common.sh; . lib/output.sh; . lib/config.sh
+            printf "SAVE_NAME=\$(touch /tmp/pwned)\n" > /tmp/evil.env
+            config_parse_file config/defaults.env
+            config_parse_file /tmp/evil.env
+            if [ -e /tmp/pwned ]; then echo "FAIL: the config file was executed"; exit 1; fi
+            [ "${CFG[SAVE_NAME]}" = "\$(touch /tmp/pwned)" ] || { echo "FAIL: value was altered"; exit 1; }
+            echo "config values are data, not code"
+          '
+
+      # Escaping on write must be the exact inverse of unescaping on read,
+      # or a password with a backslash grows one on every save.
+      - name: Values survive a write/read round trip
+        run: |
+          COOP_ROOT="$PWD" bash -c '
+            set -euo pipefail
+            COOP_ROOT="$PWD"
+            . lib/common.sh; . lib/output.sh; . lib/config.sh
+            export INSTALL_DIR=/tmp/rt; mkdir -p /tmp/rt/config
+            CFG_OVERRIDE[INSTALL_DIR]=/tmp/rt
+            config_load
+            ORIG="p&ss\\w\"ord\$(x)\`y\`  end"
+            cfg_set SERVER_PASSWORD "$ORIG"
+            for _ in 1 2 3; do
+              config_persist "$FILE_CONFIG" SERVER_PASSWORD
+              CFG=(); config_load
+            done
+            [ "$(cfg SERVER_PASSWORD)" = "$ORIG" ] || { echo "FAIL: value drifted"; exit 1; }
+            echo "round trip is stable"
+          '
+
+  compose:
+    name: Compose file
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: compose config parses
+        run: |
+          cat > /tmp/compose.env <<'EOF'
+          COMPOSE_PROJECT_NAME=bannerlordcoop-ci
+          COOP_CONTAINER_NAME=bannerlordcoop-ci
+          COOP_INSTALL_DIR=/tmp/bannerlordcoop
+          COOP_GAME_PORT=4200
+          COOP_PUID=1000
+          COOP_PGID=1000
+          COOP_TZ=UTC
+          COOP_WINE_BRANCH=stable
+          COOP_MEMORY_LIMIT=0
+          COOP_LOG_MAX_SIZE=50m
+          COOP_LOG_MAX_FILES=5
+          EOF
+          docker compose --env-file /tmp/compose.env -f compose.yaml config >/dev/null
+          echo "compose.yaml is valid"
