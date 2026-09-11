@@ -295,7 +295,8 @@ _doctor_data() {
         _hc warn "Data" "Ownership" "saves/ is owned by $owner, expected $expect - the container may not be able to write"
     fi
 
-    local save="$DIR_SAVES/$(cfg SAVE_NAME).sav"
+    local save
+    save="$DIR_SAVES/$(cfg SAVE_NAME).sav"
     if [[ -f "$save" ]]; then
         _hc ok "Data" "Campaign save" "$(cfg SAVE_NAME) ($(human_size_simple "$(stat -c %s "$save")"))"
         [[ -f "${save%.sav}.json" ]] \

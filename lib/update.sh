@@ -41,6 +41,8 @@ update_available() {
 # Exit code 0 means THE CHECK SUCCEEDED, which is the convention every
 # other tool follows; whether an update exists is in the output. Scripts
 # that want it as a code ask for --exit-status and get 100.
+#
+# shellcheck disable=SC2120  # called with --exit-status from bin/coop
 update_check() {
     local exit_status=0
     [[ "${1:-}" == "--exit-status" ]] && exit_status=1
@@ -174,6 +176,7 @@ _rollback_version() {
 }
 
 # ------------------------------------------------------------------ update --
+# shellcheck disable=SC2120  # called with --force from bin/coop
 update_apply() {
     local force=0 arg
     for arg in "$@"; do
