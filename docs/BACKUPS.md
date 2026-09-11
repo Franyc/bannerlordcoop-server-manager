@@ -192,3 +192,22 @@ chown -R bannerlordcoop:bannerlordcoop /srv/bannerlordcoop/saves /srv/bannerlord
 
 Then start the server. Being able to do this without the tool is a design
 goal, not an accident.
+
+## Picking one interactively
+
+Without an ID, the list is shown and you choose:
+
+```
+$ sudo coop backup restore
+
+Backups
+
+#  ID               CREATED           TYPE        SIZE   NOTE
+1  20260911-004626  2026-09-11 00:46  auto        33 MB
+2  20260910-180000  2026-09-10 18:00  pre-update  32 MB  before Workshop update
+
+Select a backup by number or ID: 2
+```
+
+In `--non-interactive` mode this is an error rather than a guess: which
+campaign to overwrite is not a decision a default should make.

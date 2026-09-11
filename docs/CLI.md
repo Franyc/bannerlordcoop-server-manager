@@ -114,7 +114,7 @@ is the only way to tell an expired session from a valid one.
 | `coop backup [--note "..."]` | yes | Create a backup now. `--json`. |
 | `coop backup list` | no | List backups with their IDs. `--json`. |
 | `coop backup info <id>` | no | What is in one. `--json`. |
-| `coop backup restore <id>` | yes | Restore saves and configuration |
+| `coop backup restore [<id>]` | yes | Restore saves and configuration. Without an ID, pick from a list. |
 | `coop import-save <dir>` | yes | Import campaign saves from a directory |
 
 A backup is identified by its ID (`20260911-004626`), by its file name, or

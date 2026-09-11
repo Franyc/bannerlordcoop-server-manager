@@ -162,7 +162,7 @@ More in [docs/STEAM.md](docs/STEAM.md).
 | `coop backup [--note "..."]` | Create a backup now |
 | `coop backup list` | List backups |
 | `coop backup info <id>` | Show what is in one |
-| `coop backup restore <id>` | Restore saves and configuration |
+| `coop backup restore [<id>]` | Restore saves and configuration |
 | `coop import-save <dir>` | Import campaign saves from a directory |
 | `coop steam status\|login\|logout` | Manage the Steam session |
 | `coop doctor` | Check the installation and say what is wrong |

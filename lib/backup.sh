@@ -342,6 +342,30 @@ backup_resolve() {
     fail "$EX_BACKUP" "No backup found with ID '$want'." "List them with: coop backup list"
 }
 
+# backup_select_interactive
+#
+# Used when `coop backup restore` is called without an ID. Shows the list
+# and asks. Refuses in non-interactive mode rather than picking something
+# on the caller's behalf - choosing which campaign to overwrite is not a
+# decision a default should make.
+backup_select_interactive() {
+    local files=() choice
+    mapfile -t files < <(_backup_all_files)
+    (( ${#files[@]} > 0 )) || fail "$EX_BACKUP" \
+        "There are no backups to restore." \
+        "Create one with: coop backup"
+
+    is_interactive || fail "$EX_USAGE" \
+        "Which backup should be restored?" \
+        "Pass an ID: coop backup restore <id>" \
+        "List them with: coop backup list --json"
+
+    backup_list
+    ask choice "Select a backup by number or ID"
+    [[ -n "$choice" ]] || fail "$EX_USAGE" "No backup selected."
+    printf '%s' "$choice"
+}
+
 # ------------------------------------------------------------- validation --
 # A backup may have come from elsewhere. Before anything is unpacked, the
 # archive has to prove it is what it claims to be.

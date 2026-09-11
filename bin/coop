@@ -69,7 +69,8 @@ DATA
     backup [--note "..."]   Create a backup now
     backup list             List backups
     backup info <id>        Show what is in one
-    backup restore <id>     Restore saves and configuration
+    backup restore [<id>]   Restore saves and configuration
+                            (without an ID, pick from a list)
     import-save <dir>       Import campaign saves from a directory
 
 DIAGNOSTICS
@@ -409,7 +410,9 @@ cmd_backup() {
         list)    require_installation; backup_list; return ;;
         info)    require_installation; backup_info "${1:?Usage: coop backup info <id>}"; return ;;
         restore) require_installation; require_root; acquire_lock "backup restore"
-                 backup_restore "${1:?Usage: coop backup restore <id>}"; return ;;
+                 # Without an ID, offer the list rather than failing: the
+                 # ID is rarely something anyone remembers.
+                 backup_restore "${1:-$(backup_select_interactive)}"; return ;;
         --auto)  require_installation; require_root; acquire_lock backup
                  backup_create auto >/dev/null; return ;;
         -*)      : ;;
