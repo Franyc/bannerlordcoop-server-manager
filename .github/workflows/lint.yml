@@ -105,6 +105,25 @@ jobs:
             echo "round trip is stable"
           '
 
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install jq
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq
+
+      # The settings table in docs/CONFIGURATION.md is generated from the
+      # spec and the defaults, so it cannot describe a setting that does
+      # not exist or miss one that does.
+      - name: Settings table is current
+        run: tools/gen-config-docs.sh --check
+
+      # Command names, configuration keys and links are the three things
+      # that drift silently between code and prose.
+      - name: Documentation matches the implementation
+        run: tools/check-docs.sh
+
   compose:
     name: Compose file
     runs-on: ubuntu-latest
