@@ -1,0 +1,524 @@
+#!/usr/bin/env bash
+#
+# coop - Bannerlord Coop Server Installer & Manager
+#
+# The single entry point. Everything a user or a script does goes through
+# here; the libraries under lib/ never talk to the terminal on their own.
+#
+# https://github.com/PlodyIce/bannerlordcoop-server-manager
+
+set -uo pipefail
+
+# Resolve the project root through any symlink, so /usr/local/bin/coop
+# finds its libraries wherever the repository was cloned.
+_self="${BASH_SOURCE[0]}"
+while [[ -L "$_self" ]]; do
+    _link="$(readlink "$_self")"
+    [[ "$_link" == /* ]] && _self="$_link" || _self="$(dirname "$_self")/$_link"
+done
+COOP_ROOT="$(cd "$(dirname "$_self")/.." && pwd)"
+readonly COOP_ROOT
+unset _self _link
+
+for _lib in common output config state docker server steam compat deps backup update provision health; do
+    # shellcheck source=/dev/null
+    . "${COOP_ROOT}/lib/${_lib}.sh" || { echo "coop: cannot load lib/${_lib}.sh" >&2; exit 1; }
+done
+unset _lib
+
+install_traps
+
+# --------------------------------------------------------------- usage --
+usage() {
+    cat <<'HELPTEXT'
+coop - Bannerlord Coop Server Installer & Manager
+
+USAGE
+    coop [global options] <command> [options]
+
+SETUP
+    install                 Install a server on this host
+      --default               Recommended defaults, three questions
+      --advanced              Configure ports, paths, backups and updates
+      --non-interactive       Never prompt; missing values are an error
+
+RUNNING
+    status                  Show what the server is doing
+    start | stop | restart  Start or stop the server, with a closing save
+    save                    Force a save and wait for it
+    console <command>       Send a command to the server console
+                            (status players save say kick help)
+    logs [--follow] [-n N]  Show the server log
+
+CONFIGURATION
+    config                  Edit common settings
+      --advanced              Include the less common ones
+      --list                  Show every setting, its value and default
+      --get KEY               Print one value
+      --set KEY=VALUE         Change one value
+      --apply                 Regenerate files and restart if needed
+
+SOFTWARE
+    update                  Install a newer Coop build
+      --check                 Only report whether one exists
+      --force                 Install even if the check says otherwise
+    rollback                Go back to the previous Coop build
+    steam status|login|logout
+
+DATA
+    backup [--note "..."]   Create a backup now
+    backup list             List backups
+    backup info <id>        Show what is in one
+    backup restore <id>     Restore saves and configuration
+    import-save <dir>       Import campaign saves from a directory
+
+DIAGNOSTICS
+    doctor                  Check the installation and say what is wrong
+    version                 Show the manager and Coop versions
+
+GLOBAL OPTIONS
+    --install-dir <path>    Operate on the installation in <path>
+    --instance <id>         Operate on a named instance
+    --config <file>         Read settings from <file>
+    --json                  Machine-readable output where supported
+    --non-interactive       Never prompt
+    --yes                   Answer confirmations with yes
+    --quiet                 Only warnings and errors
+    --verbose               Extra detail
+    -h, --help              This text
+
+Every setting can also be passed as a flag, derived from its name:
+    --save-name "My Campaign"   --game-port 4210   --backup-keep-auto 24
+See 'coop config --list' for the full set.
+
+EXIT CODES
+    0 success   2 usage   10 configuration   20 dependency   30 Steam
+    40 runtime  50 health 60 backup/restore  70 locked
+HELPTEXT
+}
+
+# ------------------------------------------------- global option parsing --
+# Global options may appear before or after the command. Anything that is
+# not one is passed through to the command.
+ARGS=()
+CONFIG_FILE=""
+
+# Turns --save-name into SAVE_NAME, so every setting in the spec is a flag
+# without having to be listed twice.
+_flag_to_key() {
+    local f="${1#--}"
+    printf '%s' "${f//-/_}" | tr '[:lower:]' '[:upper:]'
+}
+
+while (( $# )); do
+    case "$1" in
+        --json)            OUTPUT_FORMAT="json"; shift ;;
+        --non-interactive) NON_INTERACTIVE=1; shift ;;
+        --yes|-y)          ASSUME_YES=1; shift ;;
+        --quiet|-q)        QUIET=1; shift ;;
+        --verbose|-v)      VERBOSE=1; shift ;;
+        --config)          CONFIG_FILE="${2:?--config needs a file}"; shift 2 ;;
+        --install-dir)     CFG_OVERRIDE[INSTALL_DIR]="${2:?--install-dir needs a path}"; shift 2 ;;
+        --instance)        CFG_OVERRIDE[INSTANCE_ID]="${2:?--instance needs an id}"; shift 2 ;;
+        -h|--help)         usage; exit 0 ;;
+        --version)         ARGS+=("version"); shift ;;
+
+        # Convenient aliases for the names the documentation uses.
+        --password)          CFG_OVERRIDE[SERVER_PASSWORD]="${2:-}"; shift 2 ;;
+        --channel)           CFG_OVERRIDE[INSTALL_CHANNEL]="${2:-}"; shift 2 ;;
+        --backup-retention)  CFG_OVERRIDE[BACKUP_KEEP_AUTO]="${2:-}"; shift 2 ;;
+
+        --*=*)
+            _k="$(_flag_to_key "${1%%=*}")"
+            if [[ -n "${CONFIG_SPEC[$_k]:-}" ]]; then
+                CFG_OVERRIDE["$_k"]="${1#*=}"; shift
+            else
+                ARGS+=("$1"); shift
+            fi ;;
+        --*)
+            _k="$(_flag_to_key "$1")"
+            if [[ -n "${CONFIG_SPEC[$_k]:-}" && $# -ge 2 && "${2:0:1}" != "-" ]]; then
+                CFG_OVERRIDE["$_k"]="$2"; shift 2
+            else
+                ARGS+=("$1"); shift
+            fi ;;
+        *) ARGS+=("$1"); shift ;;
+    esac
+done
+unset _k
+
+set -- "${ARGS[@]:-}"
+COOP_COMMAND="${1:-status}"
+[[ $# -gt 0 ]] && shift
+
+config_load ${CONFIG_FILE:+--config "$CONFIG_FILE"}
+
+# ---------------------------------------------------------- sanity gate --
+# Most commands are meaningless without an installation, and saying so
+# plainly beats a stack of confusing errors further down.
+require_installation() {
+    installation_present || fail "$EX_CONFIG" \
+        "No Bannerlord Coop installation found in $INSTALL_DIR." \
+        "Install one with:  sudo coop install" \
+        "Or point at an existing one:  coop --install-dir <path> ${COOP_COMMAND}"
+}
+
+# ------------------------------------------------------------- commands --
+cmd_install() {
+    local mode="" skip_download=0 arg
+    for arg in "$@"; do
+        case "$arg" in
+            --default)  mode="default" ;;
+            --advanced) mode="advanced" ;;
+            --no-download) skip_download=1 ;;   # for testing the plumbing
+            *) fail "$EX_USAGE" "Unknown option for install: $arg" ;;
+        esac
+    done
+    require_root
+
+    out_title "Bannerlord Coop Server Installer"
+    out_line "  Manager v${MANAGER_VERSION}"
+    out_line ""
+
+    # ---- [1/8] read-only system check --------------------------------
+    out_line "[1/8] System compatibility"
+    local pf=0
+    compat_preflight "$INSTALL_DIR" "$(cfg GAME_PORT)" || pf=$?
+    compat_report
+    case "$pf" in
+        2) fail "$EX_DEPS" \
+               "This system cannot run a Bannerlord Coop server." \
+               "Each failing line above says why. No changes have been made to your system." ;;
+        1) confirm "Continue despite the warnings above?" no \
+               || { log "Nothing was changed."; exit 0; } ;;
+    esac
+
+    # ---- existing installation ---------------------------------------
+    if installation_present; then
+        case "$(provision_existing_menu)" in
+            1) exec "$0" ${OUTPUT_FORMAT:+--json} update ;;
+            2) log "Repairing"; provision_run 1; server_start; provision_validate; exit $? ;;
+            3) mode="advanced" ;;
+            *) log "Nothing was changed."; exit 0 ;;
+        esac
+    fi
+
+    # ---- [2/8] setup mode --------------------------------------------
+    if [[ -z "$mode" ]]; then
+        if (( NON_INTERACTIVE )); then
+            mode="default"
+        else
+            out_line ""
+            out_line "[2/8] Setup mode"
+            out_line ""
+            out_line "  [1] Default setup"
+            out_line "      Recommended. Sensible defaults, three questions."
+            out_line ""
+            out_line "  [2] Advanced setup"
+            out_line "      Ports, paths, backups, updates and other options."
+            out_line ""
+            local choice; ask choice "Select setup mode" "1"
+            [[ "$choice" == "2" ]] && mode="advanced" || mode="default"
+        fi
+    fi
+
+    # ---- [3/8] collect ------------------------------------------------
+    if (( ! NON_INTERACTIVE )); then
+        out_line ""
+        out_line "[3/8] Server configuration"
+        case "$mode" in
+            advanced) provision_collect_advanced ;;
+            *)        provision_collect_default ;;
+        esac
+        # INSTANCE_ID or INSTALL_DIR may have changed; recompute the paths.
+        config_load ${CONFIG_FILE:+--config "$CONFIG_FILE"}
+    fi
+    config_validate_all
+
+    # ---- [4/8] steam ---------------------------------------------------
+    out_line ""
+    out_line "[4/8] Steam authentication"
+    if [[ "$(cfg INSTALL_CHANNEL)" == "workshop" ]]; then
+        deps_install_base
+        deps_install_docker
+        case "$(steam_status)" in
+            absent)
+                if (( NON_INTERACTIVE )); then
+                    fail "$EX_STEAM" \
+                        "No Steam session is present in $DIR_STEAM." \
+                        "Steam Guard cannot be answered without a terminal." \
+                        "Authenticate once with 'coop steam login', then re-run this install."
+                fi
+                steam_login ;;
+            *) ok "Steam session present ($(cfg STEAM_USERNAME))" ;;
+        esac
+    else
+        ok "Custom build channel - Steam is not used"
+    fi
+
+    # ---- [5/8] summary --------------------------------------------------
+    out_line ""
+    out_line "[5/8] Summary"
+    provision_summary
+    confirm "Install with these settings?" yes || { log "Nothing was changed."; exit 0; }
+
+    # ---- [6/8] dependencies and provisioning ----------------------------
+    out_line ""
+    out_line "[6/8] Installation"
+    deps_install_base
+    deps_install_docker
+    deps_ensure_service_user
+    deps_suggest_daemon_config
+    acquire_lock install
+    provision_run "$skip_download"
+    state_set setup_profile "$mode"
+    _install_cli_symlink
+
+    # ---- [7/8] start -----------------------------------------------------
+    out_line ""
+    out_line "[7/8] Starting the server"
+    if (( skip_download )); then
+        warn "Skipped the download, so there is nothing to start."
+    else
+        server_start || warn "The server did not reach 'serving'. See: coop logs"
+    fi
+
+    # ---- [8/8] validation -------------------------------------------------
+    out_line ""
+    out_line "[8/8] Validation"
+    provision_validate || true
+
+    out_line "Installation complete."
+    out_line ""
+    out_kv "Connect to" "UDP $(cfg GAME_PORT) on this host's public address"
+    out_kv "Next"       "coop status"
+    out_line ""
+    out_line "  Open UDP $(cfg GAME_PORT) at your hosting provider as well - Docker"
+    out_line "  publishes ports past a host firewall such as ufw."
+    out_line ""
+}
+
+_install_cli_symlink() {
+    local target=/usr/local/bin/coop
+    [[ -L "$target" && "$(readlink -f "$target")" == "$(readlink -f "${COOP_ROOT}/bin/coop")" ]] && return 0
+    ln -sf "${COOP_ROOT}/bin/coop" "$target" \
+        && ok "CLI available as 'coop'" \
+        || warn "Could not create $target - call ${COOP_ROOT}/bin/coop directly."
+}
+
+cmd_config() {
+    local mode="" key value arg
+    for arg in "$@"; do
+        case "$arg" in
+            --advanced) mode="advanced" ;;
+            --list)     mode="list" ;;
+            --apply)    mode="apply" ;;
+            --get)      mode="get" ;;
+            --set)      mode="set" ;;
+            --*)        fail "$EX_USAGE" "Unknown option for config: $arg" ;;
+            *)          [[ "$mode" == "get" || "$mode" == "set" ]] && value="$arg" ;;
+        esac
+    done
+    require_installation
+
+    case "$mode" in
+        list)
+            if is_json; then
+                local arr="[]"
+                for key in $(config_keys); do
+                    arr="$(jq -c -n --argjson acc "$arr" \
+                        --arg k "$key" --arg v "$(cfg "$key")" \
+                        --arg t "$(config_effective_type "$key")" \
+                        --arg r "$(config_restart "$key")" \
+                        --arg d "$(config_describe "$key")" \
+                        '$acc + [{key:$k, value:$v, type:$t, restart_required:$r, description:$d}]')"
+                done
+                jq -n --argjson s "$arr" '{ok:true, settings:$s}'
+            else
+                out_title "Settings"
+                local rows=("$(printf 'SETTING\tVALUE\tTYPE\tRESTART')")
+                for key in $(config_keys); do
+                    local shown; shown="$(cfg "$key")"
+                    [[ "$key" == "SERVER_PASSWORD" && -n "$shown" ]] && shown="********"
+                    rows+=("$(printf '%s\t%s\t%s\t%s' "$key" "${shown:--}" \
+                        "$(config_effective_type "$key")" "$(config_restart "$key")")")
+                done
+                out_table "${rows[@]}"
+                out_line ""
+                out_line "  Change one:  coop config --set KEY=VALUE"
+                out_line "  Details:     $FILE_CONFIG"
+                out_line ""
+            fi ;;
+        get)
+            [[ -n "${value:-}" ]] || fail "$EX_USAGE" "Usage: coop config --get KEY"
+            [[ -n "${CONFIG_SPEC[$value]:-}" ]] || fail "$EX_CONFIG" "Unknown setting: $value"
+            printf '%s\n' "$(cfg "$value")" ;;
+        set)
+            [[ -n "${value:-}" && "$value" == *=* ]] || fail "$EX_USAGE" "Usage: coop config --set KEY=VALUE"
+            key="${value%%=*}"
+            require_root
+            cfg_set "$key" "${value#*=}"
+            config_persist "$FILE_CONFIG" "$key"
+            ok "$key = $( [[ "$key" == SERVER_PASSWORD ]] && printf '********' || cfg "$key" )"
+            _config_apply_after_change "$key" ;;
+        apply)
+            require_root
+            _config_apply_after_change "" --force ;;
+        *)
+            require_root
+            (( NON_INTERACTIVE )) && fail "$EX_USAGE" \
+                "Interactive configuration needs a terminal." \
+                "Use: coop config --set KEY=VALUE"
+            [[ "$mode" == "advanced" ]] && provision_collect_advanced || provision_collect_default
+            config_validate_all
+            provision_summary
+            confirm "Save these settings?" yes || { log "Nothing was changed."; return 0; }
+            config_persist "$FILE_CONFIG" $(config_keys)
+            _config_apply_after_change "" --force ;;
+    esac
+}
+
+# Regenerates what the server actually reads, and offers a restart only
+# when the changed setting needs one.
+_config_apply_after_change() {
+    local key="${1:-}" force="${2:-}"
+    config_write_compose_env
+    server_config_render
+    provision_install_units
+
+    local needs_restart=0
+    if [[ "$force" == "--force" ]]; then needs_restart=1
+    elif [[ -n "$key" && "$(config_restart "$key")" == "yes" ]]; then needs_restart=1; fi
+
+    (( needs_restart )) || return 0
+    container_running || return 0
+
+    if confirm "The server must restart for this to take effect. Restart now?" yes; then
+        server_stop && server_start
+    else
+        log "Restart later with: coop restart"
+    fi
+}
+
+cmd_backup() {
+    local sub="${1:-create}"
+    [[ $# -gt 0 ]] && shift
+    case "$sub" in
+        create|--note) : ;;
+        list)    require_installation; backup_list; return ;;
+        info)    require_installation; backup_info "${1:?Usage: coop backup info <id>}"; return ;;
+        restore) require_installation; require_root; acquire_lock "backup restore"
+                 backup_restore "${1:?Usage: coop backup restore <id>}"; return ;;
+        --auto)  require_installation; require_root; acquire_lock backup
+                 backup_create auto >/dev/null; return ;;
+        -*)      : ;;
+        *)       fail "$EX_USAGE" "Unknown backup subcommand: $sub" ;;
+    esac
+
+    local note=""
+    [[ "$sub" == "--note" ]] && note="${1:-}"
+    while (( $# )); do
+        case "$1" in
+            --note) note="${2:-}"; shift 2 ;;
+            *) note="$1"; shift ;;
+        esac
+    done
+
+    require_installation; require_root; acquire_lock backup
+    local archive; archive="$(backup_create manual "$note")"
+    if is_json; then
+        jq -n --arg file "$(basename "$archive")" --arg dir "$DIR_BACKUPS" \
+            '{ok:true, file:$file, directory:$dir}'
+    fi
+}
+
+cmd_steam() {
+    local sub="${1:-status}"
+    [[ $# -gt 0 ]] && shift
+    require_installation
+    case "$sub" in
+        status)
+            local probe="" st
+            [[ "${1:-}" == "--probe" ]] && probe="--probe"
+            st="$(steam_status $probe)"
+            if is_json; then
+                jq -n --arg s "$st" --arg u "$(cfg STEAM_USERNAME)" --arg e "$(steam_status_explain "$st")" \
+                    '{ok:($s=="valid" or $s=="present"), session:$s, username:$u, detail:$e}'
+            else
+                out_title "Steam"
+                out_kv "Account" "$( [[ -n "$(cfg STEAM_USERNAME)" ]] && cfg STEAM_USERNAME || printf 'not set' )"
+                out_kv "Session" "$st"
+                out_kv "Meaning" "$(steam_status_explain "$st")"
+                out_line ""
+            fi
+            [[ "$st" == "valid" || "$st" == "present" ]] || return "$EX_STEAM" ;;
+        login)  require_root; steam_login "$@"; config_persist "$FILE_CONFIG" STEAM_USERNAME ;;
+        logout) require_root; steam_logout ;;
+        *) fail "$EX_USAGE" "Unknown steam subcommand: $sub" ;;
+    esac
+}
+
+cmd_logs() {
+    require_installation
+    container_exists || fail "$EX_RUNTIME" "No container yet - nothing to show."
+    local follow=0 lines=100 arg
+    while (( $# )); do
+        arg="$1"
+        case "$arg" in
+            --follow|-f) follow=1; shift ;;
+            -n) lines="${2:-100}"; shift 2 ;;
+            *) shift ;;
+        esac
+    done
+    if (( follow )); then
+        docker logs -f --tail "$lines" "$CONTAINER_NAME" 2>&1 | tr -d '\r'
+    else
+        container_logs_tail "$lines"
+    fi
+}
+
+cmd_version() {
+    if is_json; then
+        jq -n --arg m "$MANAGER_VERSION" --arg c "$(server_version)" \
+              --arg ch "$(cfg INSTALL_CHANNEL)" \
+            '{ok:true, manager_version:$m, coop_version:$c, install_channel:$ch}'
+    else
+        out_line "Bannerlord Coop Server Manager v${MANAGER_VERSION}"
+        out_line "Installed Coop build:       $(server_version)"
+        out_line ""
+        out_line "The manager and the Coop mod are versioned separately."
+    fi
+}
+
+# ------------------------------------------------------------ dispatch --
+case "$COOP_COMMAND" in
+    install)     cmd_install "$@" ;;
+    status)      require_installation; status_report ;;
+    start)       require_installation; require_root; acquire_lock start; server_start || exit "$EX_HEALTH" ;;
+    stop)        require_installation; require_root; acquire_lock stop; server_stop ;;
+    restart)     require_installation; require_root; acquire_lock restart
+                 server_stop; server_start || exit "$EX_HEALTH" ;;
+    save)        require_installation; require_root; server_save || exit "$EX_RUNTIME" ;;
+    console)     require_installation
+                 (( $# )) || fail "$EX_USAGE" "Usage: coop console <command>   (try: coop console players)"
+                 server_cmd "$@"; sleep 2
+                 out_section "--- server response ---"
+                 docker logs --since 4s "$CONTAINER_NAME" 2>&1 | tr -d '\r' | grep -v '^[[:space:]]*$' | tail -30 ;;
+    logs)        cmd_logs "$@" ;;
+    config)      cmd_config "$@" ;;
+    update)      require_installation
+                 case "${1:-}" in
+                     --check)     shift; update_check "$@" ;;
+                     --scheduled) require_root; acquire_lock update; update_scheduled ;;
+                     *)           require_root; acquire_lock update; update_apply "$@" ;;
+                 esac ;;
+    rollback)    require_installation; require_root; acquire_lock rollback; rollback_apply "$@" ;;
+    backup)      cmd_backup "$@" ;;
+    import-save) require_installation; require_root; acquire_lock import
+                 backup_import_save "${1:?Usage: coop import-save <directory>}" ;;
+    steam)       cmd_steam "$@" ;;
+    doctor)      doctor_run ;;
+    version)     cmd_version ;;
+    help|-h|--help) usage ;;
+    *)           error "Unknown command: $COOP_COMMAND"; out_line ""; usage; exit "$EX_USAGE" ;;
+esac

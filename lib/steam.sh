@@ -1,0 +1,260 @@
+# shellcheck shell=bash
+#
+# steam.sh - Steam authentication and Workshop downloads, as a capability
+# of its own.
+#
+# Nothing in this file knows about the installer's user interface, and the
+# installer does not know how Steam works. That separation is what makes
+# the later hosting case possible: a backend can place a prepared session
+# in state/steam and provision an instance without a single prompt.
+#
+# WHY THE PASSWORD NEVER PASSES THROUGH THIS CODE
+# -----------------------------------------------
+# The tempting shape is to read the password with `read -s` and hand it to
+# `steamcmd +login user password`. That would put the password in the
+# container's command line, where `ps` and `docker inspect` can read it.
+# So the terminal is handed to SteamCMD instead: it prompts for the
+# password and the Steam Guard code itself, and the manager never sees
+# either. What persists afterwards is Steam's own session in a volume -
+# not a credential this project invented a place for.
+#
+# Steam Guard is respected as it stands. There is no way around it and no
+# attempt is made to find one.
+
+_steam_volumes() {
+    printf '%s\n' \
+        -v "${DIR_STEAM}:/root/.local/share/Steam" \
+        -v "${DIR_WORKSHOP}:/root/.local/share/Steam/steamapps/workshop"
+}
+
+# _steamcmd [docker-flags...] -- [steamcmd-args...]
+_steamcmd() {
+    local docker_flags=() steam_args=() seen=0 arg
+    for arg in "$@"; do
+        if [[ "$arg" == "--" && $seen -eq 0 ]]; then seen=1; continue; fi
+        if (( seen )); then steam_args+=("$arg"); else docker_flags+=("$arg"); fi
+    done
+
+    mkdir -p "$DIR_STEAM" "$DIR_WORKSHOP"
+    # shellcheck disable=SC2046  # word splitting of the volume list is intended
+    docker run --rm "${docker_flags[@]}" \
+        $(_steam_volumes) \
+        "$(cfg STEAMCMD_IMAGE)" "${steam_args[@]}"
+}
+
+# Files Steam writes once a session exists. Checking for them is an offline
+# test: it proves a session was established, not that it is still valid.
+steam_session_files_present() {
+    [[ -d "$DIR_STEAM" ]] || return 1
+    compgen -G "${DIR_STEAM}/config/config.vdf" >/dev/null 2>&1 && return 0
+    compgen -G "${DIR_STEAM}/ssfn*" >/dev/null 2>&1 && return 0
+    return 1
+}
+
+# steam_status [--probe]
+#
+# Without --probe this is instant and offline. With it, SteamCMD actually
+# logs in and quits - a few seconds, no download - which is the only way to
+# tell an expired session from a valid one.
+#
+# Prints one of: absent | present | valid | expired
+steam_status() {
+    local probe=0
+    [[ "${1:-}" == "--probe" ]] && probe=1
+
+    if [[ -z "$(cfg STEAM_USERNAME)" ]]; then
+        printf 'absent'; return 0
+    fi
+    if ! steam_session_files_present; then
+        printf 'absent'; return 0
+    fi
+    if (( ! probe )); then
+        printf 'present'; return 0
+    fi
+
+    local out
+    out="$(_steamcmd -- +login "$(cfg STEAM_USERNAME)" +quit 2>&1)" || true
+    if grep -qiE 'Logged in OK|Waiting for (user info|client config)' <<<"$out"; then
+        printf 'valid'
+    elif grep -qiE 'Login Failure|Cached credentials not found|two-factor|Steam Guard|password:' <<<"$out"; then
+        printf 'expired'
+    else
+        # Cannot tell - Steam may simply be unreachable. Saying "expired"
+        # would send the user off to re-authenticate for nothing.
+        printf 'present'
+    fi
+}
+
+steam_status_explain() {
+    case "$1" in
+        absent)  printf 'no Steam session - run: coop steam login' ;;
+        present) printf 'a session exists (not verified)' ;;
+        valid)   printf 'authenticated' ;;
+        expired) printf 'session expired - run: coop steam login' ;;
+    esac
+}
+
+# ------------------------------------------------------------------- login --
+steam_login() {
+    docker_require
+    local user="${1:-$(cfg STEAM_USERNAME)}"
+
+    if [[ -z "$user" ]]; then
+        is_interactive || fail "$EX_CONFIG" \
+            "No Steam account configured." \
+            "Pass --steam-username <name>, or run 'coop steam login' on a terminal."
+        ask user "Steam username"
+    fi
+    [[ -n "$user" ]] || fail "$EX_CONFIG" "A Steam username is required."
+
+    is_interactive || fail "$EX_STEAM" \
+        "Steam authentication needs a terminal." \
+        "Steam Guard cannot be answered non-interactively." \
+        "Authenticate once with 'coop steam login', then automation can reuse the session."
+
+    cfg_set STEAM_USERNAME "$user"
+
+    out_line ""
+    out_line "Steam authentication"
+    out_line ""
+    out_line "  Downloading the Bannerlord Coop Workshop item requires a Steam account"
+    out_line "  that owns Mount & Blade II: Bannerlord. Anonymous access does not work."
+    out_line ""
+    out_line "  SteamCMD will now ask for the password and, if the account has Steam"
+    out_line "  Guard enabled, for a code. It asks directly - the password is not"
+    out_line "  handled by this installer and is never written anywhere."
+    out_line ""
+
+    # -it hands the terminal straight to SteamCMD.
+    _steamcmd -it -- +login "$user" +quit || true
+
+    if steam_session_files_present; then
+        _steam_fix_ownership
+        ok "Steam session stored in ${DIR_STEAM}"
+        return 0
+    fi
+    fail "$EX_STEAM" \
+        "Steam authentication did not complete." \
+        "Check the username and password, and the Steam Guard code if one was requested." \
+        "Retry with: coop steam login"
+}
+
+steam_logout() {
+    if ! steam_session_files_present; then
+        log "No Steam session to remove."
+        return 0
+    fi
+    confirm "Remove the stored Steam session?" no || return 0
+    rm -rf -- "${DIR_STEAM:?}"/config "${DIR_STEAM:?}"/ssfn* 2>/dev/null || true
+    ok "Steam session removed. The next download will need 'coop steam login'."
+}
+
+# SteamCMD runs as root inside its container, so everything it writes lands
+# as root on the host. Hand it back to the service user.
+_steam_fix_ownership() {
+    chown -R "$(cfg PUID):$(cfg PGID)" "$DIR_STEAM" "$DIR_WORKSHOP" 2>/dev/null || true
+}
+
+# ---------------------------------------------------------------- download --
+workshop_item_dir() {
+    printf '%s/content/%s/%s' "$DIR_WORKSHOP" "$(cfg WORKSHOP_APP_ID)" "$(cfg WORKSHOP_ITEM_ID)"
+}
+
+workshop_manifest() {
+    printf '%s/appworkshop_%s.acf' "$DIR_WORKSHOP" "$(cfg WORKSHOP_APP_ID)"
+}
+
+# steam_download
+#
+# Never prompts. A missing or expired session is an error with an
+# instruction, which is what lets a provisioning backend call this.
+steam_download() {
+    docker_require
+    local user; user="$(cfg STEAM_USERNAME)"
+    [[ -n "$user" ]] || fail "$EX_STEAM" \
+        "No Steam account configured." \
+        "Run: coop steam login"
+
+    steam_session_files_present || fail "$EX_STEAM" \
+        "No Steam session found." \
+        "Authenticate once, then this will run unattended: coop steam login"
+
+    log "Downloading Workshop item $(cfg WORKSHOP_ITEM_ID) (about 6 GB on a first install)"
+
+    local out rc=0
+    out="$(_steamcmd -- +login "$user" \
+            +workshop_download_item "$(cfg WORKSHOP_APP_ID)" "$(cfg WORKSHOP_ITEM_ID)" validate \
+            +quit 2>&1)" || rc=$?
+
+    printf '%s\n' "$out" | tail -6 >&2
+    _steam_fix_ownership
+
+    if grep -q 'Success. Downloaded item' <<<"$out"; then
+        ok "Workshop item downloaded"
+        return 0
+    fi
+
+    if grep -qiE 'Login Failure|Cached credentials not found|two-factor|Steam Guard|password:' <<<"$out"; then
+        fail "$EX_STEAM" \
+            "The Steam session has expired." \
+            "Re-authenticate once, then retry: coop steam login"
+    fi
+    if grep -qiE 'Timeout downloading|Failure|ERROR!' <<<"$out"; then
+        fail "$EX_STEAM" \
+            "The Workshop download failed." \
+            "Possible causes: Steam is unreachable, the item is unavailable," \
+            "or the account does not own Mount & Blade II: Bannerlord." \
+            "Full output: ${COOP_LOG_FILE:-run with --verbose}"
+    fi
+    fail "$EX_STEAM" \
+        "The Workshop download did not report success (steamcmd exit $rc)." \
+        "Run 'coop doctor' and check the log."
+}
+
+# ------------------------------------------------------------ installed version --
+# Timestamp of the INSTALLED version, from Steam's own manifest.
+workshop_local_time() {
+    local acf; acf="$(workshop_manifest)"
+    [[ -f "$acf" ]] || { printf '0'; return 0; }
+    grep -A6 "\"$(cfg WORKSHOP_ITEM_ID)\"" "$acf" 2>/dev/null \
+        | sed -n 's/.*"timeupdated"[[:space:]]*"\([0-9]*\)".*/\1/p' \
+        | head -1 | grep -E '^[0-9]+$' || printf '0'
+}
+
+# Timestamp of the LATEST version according to Steam. Anonymous, no API key,
+# no login - which is why the nightly check can use it.
+workshop_remote_time() {
+    curl -fsS --max-time 20 \
+        -X POST "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/" \
+        -d "itemcount=1" -d "publishedfileids[0]=$(cfg WORKSHOP_ITEM_ID)" 2>/dev/null \
+        | jq -r '.response.publishedfiledetails[0].time_updated // empty' 2>/dev/null
+}
+
+# -------------------------------------------------------------- custom channel --
+# The alternative source provider. Deliberately plain: it exists so the
+# architecture is not tied to the Workshop, not because it is the
+# comfortable path.
+custom_source_available() {
+    local src; src="$(cfg CUSTOM_SOURCE_PATH)"
+    [[ -n "$src" && -f "$src/BannerlordCoopServer.exe" ]]
+}
+
+source_fetch() {
+    case "$(cfg INSTALL_CHANNEL)" in
+        workshop) steam_download ;;
+        custom)
+            custom_source_available || fail "$EX_CONFIG" \
+                "CUSTOM_SOURCE_PATH does not contain BannerlordCoopServer.exe: $(cfg CUSTOM_SOURCE_PATH)"
+            ok "Using custom build from $(cfg CUSTOM_SOURCE_PATH)"
+            ;;
+        *) fail "$EX_CONFIG" "Unknown install channel: $(cfg INSTALL_CHANNEL)" ;;
+    esac
+}
+
+# Where the freshly fetched files live, per channel.
+source_staging_dir() {
+    case "$(cfg INSTALL_CHANNEL)" in
+        workshop) printf '%s/DedicatedServer' "$(workshop_item_dir)" ;;
+        custom)   printf '%s' "$(cfg CUSTOM_SOURCE_PATH)" ;;
+    esac
+}

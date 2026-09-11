@@ -1,0 +1,15 @@
+# The schedule itself is written by `coop` into a drop-in
+# (schedule.conf) so that a user's choice survives an upgrade of this file.
+
+[Unit]
+Description=Bannerlord Coop automatic backup schedule (%f)
+
+[Timer]
+OnCalendar=hourly
+# Catch up on runs missed while the machine was off.
+Persistent=true
+# Not exactly on the hour: avoids colliding with the server's own autosave.
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

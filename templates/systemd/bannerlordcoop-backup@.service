@@ -1,0 +1,22 @@
+# Automatic backup for one Bannerlord Coop installation.
+#
+# The unit is instantiated with the systemd-escaped installation path, so
+# %f gives the directory back and one host can run several instances
+# without a separate registry:
+#
+#   systemctl enable --now bannerlordcoop-backup@$(systemd-escape --path /srv/bannerlordcoop).timer
+
+[Unit]
+Description=Bannerlord Coop automatic backup (%f)
+Documentation=https://github.com/PlodyIce/bannerlordcoop-server-manager
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/coop --install-dir %f backup --auto
+# A backup asks the server to save first and waits for the file. That can
+# take a while on a large campaign, but must not hang forever.
+TimeoutStartSec=900
+Nice=10
+IOSchedulingClass=idle

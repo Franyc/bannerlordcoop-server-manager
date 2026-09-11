@@ -166,6 +166,23 @@ config_validate_all() {
 }
 
 # ----------------------------------------------------------------- parsing --
+# Reverses _quote_value(). Walks the string once rather than running two
+# global replacements: a value such as \\" would be mangled by the second
+# pass of a naive replace-then-replace.
+_unquote_value() {
+    local s="$1" out="" i c len="${#1}"
+    for (( i = 0; i < len; i++ )); do
+        c="${s:i:1}"
+        if [[ "$c" == "\\" && $(( i + 1 )) -lt len ]]; then
+            i=$(( i + 1 ))
+            out+="${s:i:1}"
+        else
+            out+="$c"
+        fi
+    done
+    printf '%s' "$out"
+}
+
 # config_parse_file <file>
 #
 # Reads KEY=VALUE lines into CFG. Comments and blank lines are ignored.
@@ -190,7 +207,10 @@ config_parse_file() {
         value="${BASH_REMATCH[2]}"
 
         # Strip one layer of matching quotes; keep everything else verbatim.
-        if   [[ "$value" =~ ^\"(.*)\"$ ]]; then value="${BASH_REMATCH[1]}"; value="${value//\\\"/\"}"
+        # Double-quoted values are unescaped, which must be the exact
+        # inverse of _quote_value() - a password containing a backslash
+        # would otherwise grow one more on every read/write round trip.
+        if   [[ "$value" =~ ^\"(.*)\"$ ]]; then value="$(_unquote_value "${BASH_REMATCH[1]}")"
         elif [[ "$value" =~ ^\'(.*)\'$ ]]; then value="${BASH_REMATCH[1]}"
         else value="${value%"${value##*[![:space:]]}"}"   # trim trailing space
         fi
@@ -230,7 +250,18 @@ config_load() {
     fi
 
     # 4. command line
+    #
+    # These are validated immediately, unlike values read from files. A
+    # flag was typed a second ago and can be corrected on the spot, so
+    # accepting a bad one silently - and acting on it - would be the wrong
+    # trade. Values already on disk are reported by `coop doctor` instead,
+    # which has to stay usable precisely when something is wrong.
+    local reason
     for arg in "${!CFG_OVERRIDE[@]}"; do
+        reason="$(_validate_value "$arg" "${CFG_OVERRIDE[$arg]}")"
+        [[ -z "$reason" ]] || die "$EX_CONFIG" \
+            "--$(tr 'A-Z_' 'a-z-' <<<"$arg"): $reason" \
+            "Got: '${CFG_OVERRIDE[$arg]}'"
         CFG["$arg"]="${CFG_OVERRIDE[$arg]}"
     done
 

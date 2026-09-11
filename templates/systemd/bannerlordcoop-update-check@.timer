@@ -1,0 +1,12 @@
+# The schedule itself is written by `coop` into a drop-in (schedule.conf).
+
+[Unit]
+Description=Bannerlord Coop update check schedule (%f)
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+Persistent=true
+RandomizedDelaySec=1800
+
+[Install]
+WantedBy=timers.target

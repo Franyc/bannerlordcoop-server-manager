@@ -1,0 +1,19 @@
+# Scheduled Workshop update check for one installation.
+#
+# Reports by default and only installs when AUTO_UPDATE=true, because every
+# player has to run the same Coop build - an unattended update would lock
+# out anyone who has not updated their client.
+
+[Unit]
+Description=Bannerlord Coop update check (%f)
+Documentation=https://github.com/PlodyIce/bannerlordcoop-server-manager
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/coop --install-dir %f update --scheduled
+# Exit 30 means Steam was unreachable. That is weather, not a failure of
+# this service, so it must not mark the unit as failed.
+SuccessExitStatus=0 30
+TimeoutStartSec=3600
