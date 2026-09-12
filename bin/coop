@@ -330,7 +330,7 @@ cmd_install() {
     out_kv "Campaign"   "$(cfg SAVE_NAME)"
     out_kv "Next"       "coop status"
     out_line ""
-    out_line "  Players join through Direct Connect in the co-op menu, over UDP."
+    out_line "  Players join through Direct Connect in the co-op menu."
 
     local others; others="$(host_addresses | tail -n +2 | tr '\n' ' ')"
     [[ -n "${others// /}" ]] && out_line "  Other addresses on this host: ${others% }"

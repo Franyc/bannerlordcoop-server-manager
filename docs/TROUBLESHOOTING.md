@@ -221,9 +221,10 @@ nc -zvu your-server-ip 4200
    culprit. Note that `ufw` does *not* cover it: Docker publishes ports
    ahead of ufw's rules, so a ufw rule neither opens nor closes a
    container port.
-3. **Players are using UDP and the right port.** Direct Connect,
-   `ip:4200`, not TCP and not port 7210. That port belongs to the standard
-   TaleWorlds multiplayer and is irrelevant here.
+3. **Players typed the right address.** In the co-op menu, Direct
+   Connection takes one field: `ip:4200`. Port 7210 appears in some
+   guides; it belongs to the standard TaleWorlds multiplayer and has
+   nothing to do with this server.
 
 ### "Wrong password"
 

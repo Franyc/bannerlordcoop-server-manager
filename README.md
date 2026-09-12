@@ -95,7 +95,7 @@ Installation complete.
   Campaign           My Campaign
   Next               coop status
 
-  Players join through Direct Connect in the co-op menu, over UDP.
+  Players join through Direct Connect in the co-op menu.
 ```
 
 `coop status` shows the same address at any time.
