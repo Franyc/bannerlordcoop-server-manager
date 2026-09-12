@@ -25,16 +25,23 @@ half-working. Many inexpensive VPS offers are arm64 - check before you buy.
 
 ### Supported systems
 
-| Distribution | Status | Note |
+| Distribution | Status | Tested |
 |---|---|---|
-| Ubuntu 22.04 / 24.04 / 26.04 LTS | Supported | 26.04 verified in production |
-| Debian 12 / 13 | Supported | |
-| Ubuntu 20.04+, other releases | Experimental | untested here |
-| Debian 11 | Experimental | nearing end of life |
-| Rocky / AlmaLinux / RHEL 9+ | Experimental | `dnf` path untested |
-| Fedora | Experimental | moves faster than this is tested against |
+| Ubuntu 26.04 LTS | Supported | **yes** - full install, update, rollback, backup, restore |
+| Debian 13 | Supported | **yes** - full install on a German-locale host |
+| Ubuntu 22.04 / 24.04 LTS | Supported | no - same package sources as 26.04 |
+| Debian 12 | Supported | no - same package sources as 13 |
+| Ubuntu 20.04+, other releases | Experimental | no |
+| Debian 11 | Experimental | no - nearing end of life |
+| Rocky / AlmaLinux / RHEL 9+ | Experimental | no - the `dnf` path has never run |
+| Fedora | Experimental | no - moves faster than this is tested against |
 | Anything older | Unsupported | no current Docker Engine |
 | Any distribution, arm64 | Unsupported | see above |
+
+"Supported" without "tested" means the compatibility matrix accepts it and
+the package sources are the same as a release that was tested - not that
+somebody has run it. The two rows marked **yes** are the ones with
+evidence behind them.
 
 The host distribution matters less than it might seem: Wine, the .NET
 runtime and the game live inside the container. What the host provides is

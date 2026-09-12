@@ -220,7 +220,7 @@ exits 70 rather than waiting.
 | | |
 |---|---|
 | Memory | 0.9-1.6 GB - about 890 MB on a fresh world, 1.2-1.6 GB on a grown campaign |
-| CPU | about 1.2 cores, with or without players |
+| CPU | about 1.2 cores, with or without players - 120-122% on Ubuntu 26.04, 121% on Debian 13 |
 | Bandwidth | about 58 KB/s per player |
 | Campaign load time | about 2 minutes for a grown save |
 | Workshop item | about 6.1 GB |

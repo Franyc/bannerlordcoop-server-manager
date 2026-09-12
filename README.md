@@ -53,11 +53,16 @@ installed for you if they are missing.
 
 | Distribution | Status |
 |---|---|
-| Ubuntu 22.04 / 24.04 / 26.04 LTS | Supported |
-| Debian 12 / 13 | Supported |
+| Ubuntu 26.04 LTS | Supported, tested |
+| Debian 13 | Supported, tested |
+| Ubuntu 22.04 / 24.04 LTS | Supported |
+| Debian 12 | Supported |
 | Rocky, AlmaLinux, RHEL 9+ | Experimental |
 | Fedora | Experimental |
 | Anything older than the above | Unsupported |
+
+Two of those have actually been installed on; the rest share their package
+sources. [INSTALLATION.md](docs/INSTALLATION.md) says which is which.
 
 The host distribution matters less than it might seem: Wine, the .NET
 runtime and the game all live inside the container. What the host has to
