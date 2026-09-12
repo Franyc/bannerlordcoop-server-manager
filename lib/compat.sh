@@ -40,8 +40,11 @@ readonly REQUIRED_PACKAGES_DNF=(ca-certificates curl git jq rsync tar unzip util
 # Minimums are drawn from measured behaviour, not from guesswork:
 # the server itself uses 1.2-1.6 GB, and the Workshop item is ~6.1 GB held
 # in three places (workshop/, server/, rollback/) plus backups.
+# Thresholds are set against what a machine actually reports, not against
+# the number on the invoice: the kernel and firmware take their cut, so a
+# host with 8 GB fitted reports about 7.4 GB and one with 4 GB about 3.9.
 readonly MIN_MEM_MB=3800
-readonly REC_MEM_MB=7500
+readonly REC_MEM_MB=6800
 readonly MIN_DISK_GB=25
 readonly REC_DISK_GB=40
 
@@ -200,8 +203,15 @@ find_free_port() {
 }
 
 # ---------------------------------------------------------------- network --
+# The question is "can this host be reached", not "does that URL exist".
+# curl -f treats any non-2xx as failure, and api.steampowered.com answers
+# 404 on its root path - which made a perfectly healthy network report
+# "cannot reach: Steam" and refuse to install. Any HTTP response at all
+# proves the connection works; 000 means none arrived.
 compat_can_reach() {
-    curl -fsS --max-time "${2:-8}" -o /dev/null "$1" 2>/dev/null
+    local code
+    code="$(curl -sS --max-time "${2:-8}" -o /dev/null -w '%{http_code}' "$1" 2>/dev/null)"
+    [[ -n "$code" && "$code" != "000" ]]
 }
 
 # ------------------------------------------------------------- the preflight --

@@ -320,8 +320,10 @@ cmd_config() {
             *)          [[ "$mode" == "get" || "$mode" == "set" ]] && value="$arg" ;;
         esac
     done
-    require_installation
 
+    # --list and --get are read-only and are useful before anything is
+    # installed - they are how you find out what the defaults are. Only
+    # the paths that write need an installation to write to.
     case "$mode" in
         list)
             if is_json; then
@@ -357,16 +359,16 @@ cmd_config() {
         set)
             [[ -n "${value:-}" && "$value" == *=* ]] || fail "$EX_USAGE" "Usage: coop config --set KEY=VALUE"
             key="${value%%=*}"
-            require_root
+            require_installation; require_root
             cfg_set "$key" "${value#*=}"
             config_persist "$FILE_CONFIG" "$key"
             ok "$key = $( [[ "$key" == SERVER_PASSWORD ]] && printf '********' || cfg "$key" )"
             _config_apply_after_change "$key" ;;
         apply)
-            require_root
+            require_installation; require_root
             _config_apply_after_change "" --force ;;
         *)
-            require_root
+            require_installation; require_root
             (( NON_INTERACTIVE )) && fail "$EX_USAGE" \
                 "Interactive configuration needs a terminal." \
                 "Use: coop config --set KEY=VALUE"
@@ -375,7 +377,7 @@ cmd_config() {
             provision_summary
             confirm "Save these settings?" yes || { log "Nothing was changed."; return 0; }
             mapfile -t _all_keys < <(config_keys)
-        config_persist "$FILE_CONFIG" "${_all_keys[@]}"
+            config_persist "$FILE_CONFIG" "${_all_keys[@]}"
             _config_apply_after_change "" --force ;;
     esac
 }

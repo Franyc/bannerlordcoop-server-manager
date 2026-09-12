@@ -138,11 +138,22 @@ doctor_run() {
 
     _doctor_system
     _doctor_docker
-    _doctor_configuration
-    _doctor_data
-    _doctor_steam
-    _doctor_server
-    _doctor_backups
+
+    # On a host with nothing installed, every remaining check has the same
+    # cause. Reporting a dozen consequences of one fact buries it, so say
+    # the fact once and stop. It still counts as a failure: automation
+    # asking "is the server healthy" must not get a clean bill of health
+    # from a machine that has no server on it.
+    if ! installation_present; then
+        _hc fail "Installation" "Not installed" \
+            "no installation in $INSTALL_DIR - create one with: sudo coop install"
+    else
+        _doctor_configuration
+        _doctor_data
+        _doctor_steam
+        _doctor_server
+        _doctor_backups
+    fi
 
     if is_json; then
         local arr="[]" row status category name detail
@@ -286,13 +297,17 @@ _doctor_data() {
         _hc ok "Data" "$(basename "$d")/" "$(du -sh "$d" 2>/dev/null | cut -f1) in $d"
     done
 
-    local owner expect
-    expect="$(cfg PUID):$(cfg PGID)"
-    owner="$(stat -c '%u:%g' "$DIR_SAVES" 2>/dev/null)"
-    if [[ "$owner" == "$expect" ]]; then
-        _hc ok "Data" "Ownership" "$owner"
-    else
-        _hc warn "Data" "Ownership" "saves/ is owned by $owner, expected $expect - the container may not be able to write"
+    # Only meaningful once the directory exists; otherwise stat returns
+    # nothing and the message reads "owned by , expected 1000:1000".
+    if [[ -d "$DIR_SAVES" ]]; then
+        local owner expect
+        expect="$(cfg PUID):$(cfg PGID)"
+        owner="$(stat -c '%u:%g' "$DIR_SAVES" 2>/dev/null)"
+        if [[ "$owner" == "$expect" ]]; then
+            _hc ok "Data" "Ownership" "$owner"
+        else
+            _hc warn "Data" "Ownership" "saves/ is owned by $owner, expected $expect - the container may not be able to write"
+        fi
     fi
 
     local save
