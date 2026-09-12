@@ -67,7 +67,10 @@ provision_collect_default() {
         cfg_set GAME_PORT "$value"
     fi
 
-    cfg_set SERVER_LABEL "$(cfg SAVE_NAME)"
+    # On a fresh install the campaign name is the most useful label there
+    # is. On a reconfigure it is not: a name the user chose should not be
+    # overwritten because they renamed the campaign.
+    installation_present || cfg_set SERVER_LABEL "$(cfg SAVE_NAME)"
 }
 
 # Advanced setup. Everything the default mode decides silently.
