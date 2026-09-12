@@ -161,10 +161,20 @@ compat_matrix() {
 # ---------------------------------------------------- package availability --
 # Checking the OS version is not enough: an old release may still be
 # installable but no longer carry the packages. Ask the package manager.
+#
+# NEVER write `producer | grep -q` in this project. `grep -q` exits at the
+# first match, the producer then dies of SIGPIPE, and `set -o pipefail`
+# turns that into a failed pipeline - so a successful match is reported as
+# a failure. It is timing-dependent, which means it works until the output
+# gets large enough to matter. Capture first, match against the capture.
 compat_package_available() {
-    local pkg="$1"
+    local pkg="$1" out
     case "$PKG_MANAGER" in
-        apt)    apt-cache policy -- "$pkg" 2>/dev/null | grep -qE '^\s+Candidate: [^(]' ;;
+        # LC_ALL is set process-wide but repeated here, because this line
+        # is the one that broke: the label is translated, and
+        # "Installationskandidat:" is not "Candidate:".
+        apt)    out="$(LC_ALL=C apt-cache policy -- "$pkg" 2>/dev/null)" || return 1
+                grep -qE '^[[:space:]]+Candidate:[[:space:]]+[^([:space:]]' <<<"$out" ;;
         dnf)    dnf --quiet list --available "$pkg" >/dev/null 2>&1 || dnf --quiet list --installed "$pkg" >/dev/null 2>&1 ;;
         yum)    yum --quiet list available "$pkg" >/dev/null 2>&1 || yum --quiet list installed "$pkg" >/dev/null 2>&1 ;;
         zypper) zypper --quiet search --match-exact "$pkg" >/dev/null 2>&1 ;;
@@ -190,13 +200,18 @@ compat_compose_version() { docker compose version --short 2>/dev/null; }
 
 # -------------------------------------------------------------------- ports --
 port_in_use() {
-    local port="$1" proto="${2:-udp}"
-    if command -v ss >/dev/null 2>&1; then
-        [[ "$proto" == "udp" ]] && ss -lunH 2>/dev/null | grep -qE "[:.]${port}\b" \
-                                || ss -ltnH 2>/dev/null | grep -qE "[:.]${port}\b"
+    local port="$1" proto="${2:-udp}" listening
+    command -v ss >/dev/null 2>&1 || return 1  # cannot tell; treated as free
+
+    # Captured rather than piped into grep -q: see the note above
+    # compat_package_available. Reporting a busy port as free is exactly
+    # the sort of wrong answer that only shows up on a loaded machine.
+    if [[ "$proto" == "udp" ]]; then
+        listening="$(ss -lunH 2>/dev/null)" || return 1
     else
-        return 1   # cannot tell; treated as free and re-checked at start
+        listening="$(ss -ltnH 2>/dev/null)" || return 1
     fi
+    grep -qE "[:.]${port}\b" <<<"$listening"
 }
 
 # True when something OTHER than this installation's own server holds the

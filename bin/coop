@@ -9,6 +9,17 @@
 
 set -uo pipefail
 
+# Output this manager parses must not be translated. On a German host
+# `apt-cache policy` prints "Installationskandidat:" where the dependency
+# check looked for "Candidate:" - so every dependency was reported as
+# unavailable and the installer refused a perfectly good Debian machine.
+# C.UTF-8 where it exists, so a campaign name with non-ASCII characters
+# still passes through unharmed.
+case $'\n'"$(locale -a 2>/dev/null || true)"$'\n' in
+    *$'\n'C.UTF-8$'\n'*) export LC_ALL=C.UTF-8 ;;
+    *)                   export LC_ALL=C ;;
+esac
+
 # Resolve the project root through any symlink, so /usr/local/bin/coop
 # finds its libraries wherever the repository was cloned.
 _self="${BASH_SOURCE[0]}"
