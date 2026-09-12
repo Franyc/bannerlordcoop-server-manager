@@ -107,7 +107,7 @@ update_scheduled() {
     (( rc == EX_STEAM )) && return "$EX_STEAM"
 
     if update_marker_is_set && cfg_bool AUTO_UPDATE; then
-        log "AUTO_UPDATE is enabled - installing the update now."
+        log "AUTO_UPDATE is enabled. Installing the update now."
         update_apply
         return $?
     fi
@@ -196,7 +196,7 @@ update_apply() {
     fi
     if (( rc == 2 && ! force )); then
         fail "$EX_STEAM" \
-            "Could not determine whether an update exists - the Steam API is unreachable." \
+            "Could not determine whether an update exists; the Steam API is unreachable." \
             "Retry later, or force the update with: coop update --force"
     fi
 
@@ -224,7 +224,7 @@ update_apply() {
 
     # 4. fetch
     if ! source_fetch; then
-        warn "Download failed - restarting the current version."
+        warn "Download failed. Restarting the current version."
         server_start || fail "$EX_RUNTIME" "The current version did not restart. Check: coop logs"
         return "$EX_STEAM"
     fi

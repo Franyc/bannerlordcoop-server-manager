@@ -90,10 +90,10 @@ steam_status() {
 
 steam_status_explain() {
     case "$1" in
-        absent)  printf 'no Steam session - run: coop steam login' ;;
+        absent)  printf 'no Steam session. Run: coop steam login' ;;
         present) printf 'a session exists (not verified)' ;;
         valid)   printf 'authenticated' ;;
-        expired) printf 'session expired - run: coop steam login' ;;
+        expired) printf 'session expired. Run: coop steam login' ;;
     esac
 }
 
@@ -148,7 +148,7 @@ steam_login() {
     out_line "  that owns Mount & Blade II: Bannerlord. Anonymous access does not work."
     out_line ""
     out_line "  SteamCMD will now ask for the password and, if the account has Steam"
-    out_line "  Guard enabled, for a code. It asks directly - the password is not"
+    out_line "  Guard enabled, for a code. It asks directly, so the password is not"
     out_line "  handled by this installer and is never written anywhere."
     out_line ""
 

@@ -1,14 +1,14 @@
 # Architecture
 
-How this works, and why it works that way. Every measurement below was
-taken on a running server - Ubuntu 26.04 and Debian 13 - rather than read
-from documentation. The point of writing them down is that anyone later
-tempted to "simplify" something knows what it was protecting against.
+How this works, and why it works that way. The figures below come from
+running servers on Ubuntu 26.04 and Debian 13, not from documentation.
+They are recorded so that anyone tempted to simplify something can see
+what it was protecting against.
 
 ## The layers
 
 ```
-Host - Linux, x86_64, headless
+Host: Linux, x86_64, headless
  |
  +-- systemd            two timers: backup, update check
  +-- /usr/local/bin/coop -> bin/coop in the checkout
@@ -20,7 +20,7 @@ Host - Linux, x86_64, headless
      |
      +-- steamcmd container                       throwaway, on demand
 
-/srv/bannerlordcoop - persistent, outside the container
+/srv/bannerlordcoop: persistent, outside the container
     server/     -> /server  (read-only)
     config/     -> /data
     saves/      -> /data/Game Saves
@@ -54,9 +54,9 @@ check rejects it up front rather than half-working.
 
 ## The container must not be stopped by signal
 
-Measured: `docker compose stop` with the default signal ran into its
-**120-second timeout** and ended in **exit 137 - SIGKILL**. A hard kill,
-potentially in the middle of writing a save.
+Stopping the container with a signal does not work. `docker compose stop`
+runs into its 120 second timeout and ends in exit 137, a SIGKILL, possibly
+in the middle of writing a save.
 
 PID 1 ignores signals without a handler of its own, and Wine does not
 forward them to the Windows process.
@@ -105,8 +105,8 @@ pulse: time=Spring 1, 1095 timeMode=Stop players=0 parties=1954
 
 Both are read from the logs of the **current container start only**. A
 `serving` line left over from a previous run would make a failed start look
-successful - which is a bug worth preventing once rather than debugging
-twice.
+successful. That is a failure mode worth preventing once rather than
+debugging twice.
 
 ## Server exit codes
 
@@ -115,7 +115,7 @@ twice.
 | 0 | Clean shutdown |
 | 2 | Load error or timeout |
 | 3 | Runtime failure |
-| 4 | Module verification failed - files under `Modules/Coop` were modified |
+| 4 | Module verification failed: files under `Modules/Coop` were modified |
 
 Exit 4 is why `/server` is mounted **read-only**: the server checks its
 Coop assemblies with SHA-256 and refuses to start if they differ. What
@@ -168,8 +168,8 @@ values it did not author. `SAVE_NAME=$(rm -rf /)` has to be a campaign with
 an unfortunate name, not a command.
 
 `server-config.json` is **generated** from a template rather than edited in
-place. It is JSONC - comments and trailing commas - so `jq` cannot read it,
-and patching it with a regular expression is exactly how a campaign gets
+place. It is JSONC, with comments and trailing commas, so `jq` cannot read
+it, and patching it with a regular expression is how a campaign gets
 lost. Substitution is literal, because `awk`'s `gsub()` treats `&` in a
 replacement as a backreference and a password containing `&` would
 otherwise be mangled.
@@ -180,8 +180,8 @@ otherwise be mangled.
 collect  ->  validate  ->  summarise  ->  provision
 ```
 
-The collectors - default mode, advanced mode, command-line flags, a config
-file - do nothing but gather values. `provision_run()` does nothing but
+The collectors (default mode, advanced mode, command-line flags, a config
+file) do nothing but gather values. `provision_run()` does nothing but
 apply them, and never asks a question.
 
 ```
@@ -201,8 +201,8 @@ no code path asks for a password when a session is present.
 
 Container name, Compose project, lock file and systemd units are all
 derived from `INSTANCE_ID` and the installation path. Nothing is hardcoded
-to one server, so a host can run several - which costs nothing today and
-would be expensive to retrofit.
+to one server, so a host can run several. That costs nothing to allow for
+now and would be expensive to retrofit.
 
 The systemd units are templates instantiated with the escaped installation
 path, so `%f` gives the directory back and no separate registry of
@@ -219,8 +219,8 @@ exits 70 rather than waiting.
 
 | | |
 |---|---|
-| Memory | 0.9-1.6 GB - about 890 MB on a fresh world, 1.2-1.6 GB on a grown campaign |
-| CPU | about 1.2 cores, with or without players - 120-122% on Ubuntu 26.04, 121% on Debian 13 |
+| Memory | 0.9 to 1.6 GB: about 890 MB on a fresh world, 1.2 to 1.6 GB on a grown campaign |
+| CPU | about 1.2 cores, with or without players (120 to 122% on Ubuntu 26.04, 121% on Debian 13) |
 | Bandwidth | about 58 KB/s per player |
 | Campaign load time | about 50 seconds for a fresh world, about 2 minutes for a grown save |
 | Workshop item | about 6.1 GB |
@@ -244,11 +244,11 @@ saturated before the first player joins.
 - `Cannot load: GameInterface.dll` and similar right at startup. The server
   looks in the default location first; `coop assembly resolver installed`
   follows immediately.
-- `Could not find the event index for: event:/...` - sound definitions,
+- `Could not find the event index for: event:/...` is a sound definition,
   meaningless on a headless server.
-- `The 'coop_*' attribute is not declared` - the mod's own XML attributes,
-  which are not in the TaleWorlds schema.
-- `[Coop] ["ObjectManager"] Failed to get id ...` - mod-internal warnings
+- `The 'coop_*' attribute is not declared` refers to the mod's own XML
+  attributes, which are not in the TaleWorlds schema.
+- `[Coop] ["ObjectManager"] Failed to get id ...` is a mod-internal warning
   during normal play.
 
 ## Networking
@@ -263,6 +263,6 @@ multiplayer and is irrelevant here.
 
 **Docker publishes ports past `ufw`.** Docker inserts its own chains ahead
 of ufw's in `FORWARD`, so `ufw deny <port>` has no effect on a published
-container port. Only a firewall in front of the machine - your provider's -
-reliably closes one. If you ever need to restrict a container port by
-source address, the `DOCKER-USER` chain is the right place.
+container port. Only a firewall in front of the machine, such as your
+provider's, reliably closes one. If you ever need to restrict a container
+port by source address, the `DOCKER-USER` chain is the right place.

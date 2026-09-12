@@ -291,7 +291,7 @@ cmd_install() {
             *) ok "Steam session present ($(cfg STEAM_USERNAME))" ;;
         esac
     else
-        ok "Custom build channel - Steam is not used"
+        ok "Custom build channel, so Steam is not used"
     fi
 
     # ---- [7/8] provisioning ----------------------------------------------
@@ -347,7 +347,7 @@ _install_cli_symlink() {
     [[ -L "$target" && "$(readlink -f "$target")" == "$(readlink -f "${COOP_ROOT}/bin/coop")" ]] && return 0
     ln -sf "${COOP_ROOT}/bin/coop" "$target" \
         && ok "CLI available as 'coop'" \
-        || warn "Could not create $target - call ${COOP_ROOT}/bin/coop directly."
+        || warn "Could not create $target. Call ${COOP_ROOT}/bin/coop directly."
 }
 
 cmd_config() {
@@ -513,7 +513,7 @@ cmd_steam() {
 
 cmd_logs() {
     require_installation
-    container_exists || fail "$EX_RUNTIME" "No container yet - nothing to show."
+    container_exists || fail "$EX_RUNTIME" "No container yet, so there is nothing to show."
     local follow=0 lines=100 arg
     while (( $# )); do
         arg="$1"

@@ -57,7 +57,7 @@ not be reached.
 coop update
 ```
 
-1. Check the version - stop here if there is nothing new, unless `--force`
+1. Check the version, and stop here if there is nothing new, unless `--force`
 2. Stop the server cleanly, which writes a closing save
 3. Create a `pre-update` backup
 4. Copy the current build to `rollback/`
@@ -102,14 +102,14 @@ coop config --set UPDATE_CHECK_ENABLED=false
 When an update is found, a marker is written and `coop status` shows it.
 
 If Steam cannot be reached the service exits 30, which its unit file
-declares a success - an unreachable Steam API is weather, not a failure of
+declares a success. An unreachable Steam API is weather, not a failure of
 the timer.
 
 ## Why automatic updates are off
 
 The server verifies its own Coop assemblies with SHA-256, and **clients
 must run the same build**. An update installed overnight would lock out
-every player who has not yet updated their own client - the server would be
+every player who has not yet updated their own client. The server would be
 running, and nobody could join.
 
 So the default is to check and report, and let you install when your group
@@ -126,16 +126,16 @@ same pre-update backup and automatic rollback as a manual run.
 
 ## Gameplay configuration during an update
 
-`mod-config.json` holds the gameplay settings - difficulty, world ageing,
-battle size - and belongs to the Coop mod, not to this manager. A new build
-rewrites it with that build's defaults on first boot.
+`mod-config.json` holds the gameplay settings such as difficulty, world
+ageing and battle size. It belongs to the Coop mod, not to this manager.
+A new build rewrites it with that build's defaults on first boot.
 
 Neither obvious answer is right:
 
 | | |
 |---|---|
 | Keep the new file | Every setting you chose is silently reset |
-| Put your old file back | Settings the new build introduced are missing, and the mod re-adds them on the next boot - so the same fight happens every launch |
+| Put your old file back | Settings the new build introduced are missing, and the mod re-adds them on the next boot, so the same fight happens every launch |
 
 So the manager **merges**. The new file is the template: it brings the new
 keys and the comments that document them. Every value you had set is
@@ -163,7 +163,7 @@ Two safeguards. The build's own version is always kept beside yours as
 `mod-config.json.new-from-update`, so nothing is lost either way. And if
 the merged file does not account for every setting the new file had, it is
 discarded and the build's defaults are left in place with a pointer to your
-previous copy - a merge that quietly loses settings would be worse than no
+previous copy. A merge that quietly loses settings would be worse than no
 merge at all.
 
 ### How the merge works

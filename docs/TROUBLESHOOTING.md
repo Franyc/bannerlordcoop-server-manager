@@ -28,7 +28,7 @@ cat /etc/os-release
 
 **Solution.** Upgrade the operating system. The installer will not add
 third-party repositories, download loose `.deb` files, or borrow libraries
-from another release to work around it - those are exactly the things that
+from another release to work around it. Those are exactly the things that
 turn into an unexplainable failure six months later. Nothing on your system
 was changed.
 
@@ -98,8 +98,9 @@ own Bannerlord.
 curl -sS -o /dev/null -w '%{http_code}\n' https://api.steampowered.com/
 ```
 
-**Solution.** Retry - Steam has bad days. If it persists, verify the
-account owns the game, and check the manager log for SteamCMD's own output:
+**Solution.** Retry, because Steam has bad days. If it persists, verify
+the account owns the game and check the manager log for SteamCMD's own
+output:
 
 ```bash
 tail -50 /srv/bannerlordcoop/logs/manager.log
@@ -146,7 +147,7 @@ sudo coop rollback
 `server/` is mounted read-only precisely to prevent this, so if it happens,
 something wrote to it from outside the container.
 
-### Exit 2 - the save will not load
+### Exit 2, the save will not load
 
 **Cause.** A damaged or incomplete save, a missing `.json` beside the
 `.sav`, or a save written by a different Coop build.
@@ -176,7 +177,7 @@ coop logs --follow
 Look for `CAMPAIGN LOADED`. If lines are still appearing, it is loading;
 if the log is silent, it is stuck.
 
-**Solution.** Restart. If it repeats, restore a backup - and check free
+**Solution.** Restart. If it repeats, restore a backup, and check free
 disk space, because a full disk produces exactly this symptom.
 
 ### "No server files found"
@@ -221,7 +222,7 @@ nc -zvu your-server-ip 4200
    ahead of ufw's rules, so a ufw rule neither opens nor closes a
    container port.
 3. **Players are using UDP and the right port.** Direct Connect,
-   `ip:4200`, not TCP and not port 7210 - that one belongs to the standard
+   `ip:4200`, not TCP and not port 7210. That port belongs to the standard
    TaleWorlds multiplayer and is irrelevant here.
 
 ### "Wrong password"
@@ -250,7 +251,7 @@ coop version
 ```
 
 **Solution.** Everyone must run the same build. This is also why automatic
-updates are off by default - see [UPDATES.md](UPDATES.md).
+updates are off by default. See [UPDATES.md](UPDATES.md).
 
 ---
 
@@ -287,7 +288,7 @@ tar -tzf /srv/bannerlordcoop/backups/<file>.tar.gz | head
 
 **Solution.** Use an archive made by `coop backup`. If you trust this one
 and want it anyway, unpack the three directories by hand with the server
-stopped - see [BACKUPS.md](BACKUPS.md).
+stopped. See [BACKUPS.md](BACKUPS.md).
 
 ### The server will not start after a restore
 
@@ -383,7 +384,7 @@ itself failed.
 
 ### "saves/ is owned by 0:0, expected 998:998"
 
-**Cause.** Something wrote into the data directories as root - often an
+**Cause.** Something wrote into the data directories as root, often an
 unpacked archive or a manual copy.
 
 **Check.**
@@ -412,5 +413,5 @@ journalctl -u docker -n 50
 ```
 
 When reporting a problem, include `coop doctor --json` and the last 100
-lines of `coop logs`. Neither contains your password - the manager does not
-log secrets.
+lines of `coop logs`. Neither contains your password, because the manager
+does not log secrets.

@@ -6,7 +6,7 @@
 |---|---|
 | Architecture | **x86_64 only** |
 | Operating system | Linux with a current Docker Engine and systemd |
-| CPU | 2 cores minimum, 4 recommended - the server uses ~1.2 cores when idle |
+| CPU | 2 cores minimum, 4 recommended. The server uses about 1.2 cores when idle |
 | Memory | 4 GB minimum, 8 GB recommended |
 | Disk | 25 GB minimum, 40 GB recommended |
 | Privileges | root |
@@ -21,26 +21,26 @@ installed for you if they are missing.
 The dedicated server is a Windows x64 binary run under Wine. On arm64 that
 would additionally need box64 or FEX. This installer will not set up an
 emulation layer, so the architecture check refuses rather than
-half-working. Many inexpensive VPS offers are arm64 - check before you buy.
+half-working. Many inexpensive VPS offers are arm64, so check before you buy.
 
 ### Supported systems
 
 | Distribution | Status | Tested |
 |---|---|---|
-| Ubuntu 26.04 LTS | Supported | **yes** - full install, update, rollback, backup, restore |
-| Debian 13 | Supported | **yes** - full install on a German-locale host |
-| Ubuntu 22.04 / 24.04 LTS | Supported | no - same package sources as 26.04 |
-| Debian 12 | Supported | no - same package sources as 13 |
+| Ubuntu 26.04 LTS | Supported | **yes**: full install, update, rollback, backup, restore |
+| Debian 13 | Supported | **yes**: full install on a German-locale host |
+| Ubuntu 22.04 / 24.04 LTS | Supported | no, same package sources as 26.04 |
+| Debian 12 | Supported | no, same package sources as 13 |
 | Ubuntu 20.04+, other releases | Experimental | no |
-| Debian 11 | Experimental | no - nearing end of life |
-| Rocky / AlmaLinux / RHEL 9+ | Experimental | no - the `dnf` path has never run |
-| Fedora | Experimental | no - moves faster than this is tested against |
+| Debian 11 | Experimental | no, nearing end of life |
+| Rocky / AlmaLinux / RHEL 9+ | Experimental | no, the `dnf` path has never run |
+| Fedora | Experimental | no, moves faster than this is tested against |
 | Anything older | Unsupported | no current Docker Engine |
 | Any distribution, arm64 | Unsupported | see above |
 
 "Supported" without "tested" means the compatibility matrix accepts it and
-the package sources are the same as a release that was tested - not that
-somebody has run it. The two rows marked **yes** are the ones with
+the package sources are the same as a release that was tested. It does not
+mean somebody has run it. The two rows marked **yes** are the ones with
 evidence behind them.
 
 The host distribution matters less than it might seem: Wine, the .NET
@@ -70,8 +70,8 @@ System compatibility
   + Privileges         running as root
   + Package manager    apt
   > Required tools     will be installed: jq rsync
-  > Docker Engine      not installed - will be installed from Docker's own repository
-  > Docker Compose     compose plugin missing - will be installed
+  > Docker Engine      not installed, will be installed from Docker's own repository
+  > Docker Compose     compose plugin missing, will be installed
   + Memory             7946 MB
   + Disk space         67 GB free at /srv/bannerlordcoop
   + CPU cores          4
@@ -195,7 +195,7 @@ summary, which is also a convenient way to preview what a provisioning
 run would do.
 
 A missing required value is exit 10, naming the flag. A destructive step
-without `--yes` is exit 10 as well - there are no hidden confirmations.
+without `--yes` is exit 10 as well. There are no hidden confirmations.
 
 Settings can also come from a file:
 
@@ -276,8 +276,8 @@ An existing installation was found
 ```
 
 Reconfigure walks through the advanced questions with your current values
-as the defaults, then applies them and restarts - settings such as the
-port or the password only take effect on a restart. It does not
+as the defaults, then applies them and restarts, because settings such as
+the port or the password only take effect on a restart. It does not
 re-download the server; `coop update` is the command for changing the
 build. An empty answer at the password prompt keeps the existing password
 rather than clearing it.

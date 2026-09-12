@@ -25,12 +25,12 @@ coop status
 - **Shuts down properly.** Stopping sends `stop` to the server console and
   waits for the closing save, rather than killing the process mid-write.
 - **Backs up on a schedule.** Saves, server settings and gameplay settings
-  as one archive - and skips the run when the campaign has not advanced and
+  as one archive. The run is skipped when the campaign has not advanced and
   nobody is connected.
 - **Updates with a way back.** Pre-update backup, a kept copy of the
   previous build, and an automatic rollback if the new one will not start.
 - **Restores as a transaction.** A restore is validated, staged, and swapped
-  in - never unpacked over your campaign and left half-finished.
+  in. It is never unpacked over your campaign and left half-finished.
 - **Scriptable.** Every command that reports something supports `--json`,
   exit codes distinguish failure classes, and `--non-interactive` never
   hides a prompt.
@@ -40,8 +40,8 @@ coop status
 | | |
 |---|---|
 | Architecture | **x86_64 only.** The server is a Windows x64 binary run under Wine; arm64 would need an emulation layer this installer will not set up. |
-| Operating system | A Linux distribution with a current Docker Engine and systemd - see below |
-| CPU | **2 cores minimum, 4 recommended.** The server uses about 1.2 cores even with nobody connected - it does not idle down. |
+| Operating system | A Linux distribution with a current Docker Engine and systemd (see below) |
+| CPU | **2 cores minimum, 4 recommended.** The server uses about 1.2 cores even with nobody connected, because it does not idle down. |
 | Memory | 4 GB minimum, 8 GB recommended (the server uses 0.9-1.6 GB) |
 | Disk | 25 GB minimum, 40 GB recommended. The game files occupy about 18 GB across three directories, plus backups. |
 | Network | UDP 4200 reachable from the internet |
@@ -90,7 +90,7 @@ Players connect with **Direct Connect** to `<your-server-ip>:4200`.
 ### Default setup
 
 The recommended path. Two questions and a Steam login; everything else
-comes from `config/defaults.env` - the game's own value wherever the server
+comes from `config/defaults.env`: the game's own value wherever the server
 has one, and conservative choices for backups and updates.
 
 Gameplay settings are not among them. Difficulty, battle size and the rest
@@ -136,7 +136,7 @@ sudo coop install --default --non-interactive --yes \
 ```
 
 Steam Guard cannot be answered without a terminal, so authenticate once
-first - after that the session is reused and nothing prompts:
+first. After that the session is reused and nothing prompts:
 
 ```bash
 sudo coop steam login
@@ -201,7 +201,7 @@ Any setting is also a command-line flag, derived from its name:
 `--save-name`, `--game-port`, `--backup-keep-auto`.
 
 The file is **parsed, never executed**. A value is a value, even if it looks
-like a shell command - which is what makes it safe for a provisioning system
+like a shell command. That is what makes it safe for a provisioning system
 to write.
 
 Every setting, its default and whether it needs a restart:
@@ -253,7 +253,7 @@ Details: [docs/UPDATES.md](docs/UPDATES.md).
 ## Backups
 
 Automatic, hourly, and skipped when the campaign has not advanced and
-nobody is connected - the world only moves while players are on it.
+nobody is connected, because the world only moves while players are on it.
 
 ```bash
 coop backup --note "before the siege"
@@ -322,7 +322,7 @@ Installed Coop build:       build 2026-09-06 / Mount & Blade II: Bannerlord v1.4
 
 ## Status
 
-**v0.1.0 - early, but not untested.** Installed and exercised end to end on
+**v0.1.0, early but not untested.** Installed and exercised end to end on
 Ubuntu 26.04 and Debian 13:
 
 - install from nothing: dependency and Docker setup, Workshop download,
@@ -334,8 +334,8 @@ Ubuntu 26.04 and Debian 13:
 - save import, scheduled backups, and the diagnostics
 
 One thing has not been tested, and cannot be until it happens: an update to
-a genuinely **newer** Coop build. The machinery has run - version check,
-download, rollback copy, automatic rollback - but so far only against the
+a genuinely **newer** Coop build. The machinery has run (version check,
+download, rollback copy, automatic rollback), but so far only against the
 same build. Watch the output the first time you run `coop update`.
 
 ## Licence

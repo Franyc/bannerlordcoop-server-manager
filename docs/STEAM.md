@@ -26,7 +26,7 @@ Steam authentication
   that owns Mount & Blade II: Bannerlord. Anonymous access does not work.
 
   SteamCMD will now ask for the password and, if the account has Steam
-  Guard enabled, for a code. It asks directly - the password is not
+  Guard enabled, for a code. It asks directly, so the password is not
   handled by this installer and is never written anywhere.
 ```
 
@@ -36,7 +36,7 @@ What is stored afterwards is Steam's own session:
 /srv/bannerlordcoop/state/steam/
 ```
 
-No password, and no token invented by this project - just the files Steam
+No password, and no token invented by this project, just the files Steam
 writes for itself. Only the account **name** is saved, in `server.env`, so
 later downloads know which session to use.
 
@@ -52,8 +52,9 @@ installs run on their own.
 That is also why `coop steam login` works on a host where nothing has been
 installed yet: it is the command that has to be able to go first. On a bare
 machine it creates the installation directory and, if Docker is missing,
-installs it - SteamCMD runs in a container, so that is a real prerequisite
-rather than a convenience. It says so before doing it.
+installs it. SteamCMD runs in a container, so Docker is a real
+prerequisite rather than a convenience, and the command says so before
+doing it.
 
 ## Checking the session
 
@@ -73,8 +74,8 @@ coop steam status --probe
 | `expired` | Steam rejected it. Run `coop steam login`. |
 
 The offline check is instant and good enough for `coop doctor`. `--probe`
-runs a login-and-quit against Steam - a few seconds, no download - which is
-the only way to tell `present` from `expired` for certain.
+runs a login-and-quit against Steam, a few seconds with no download. That
+is the only way to tell `present` from `expired` for certain.
 
 ## When a session expires
 

@@ -127,7 +127,7 @@ status_report() {
 
     if update_marker_is_set; then
         out_line ""
-        out_line "  ${C_YEL}A Workshop update is available${C_OFF} - install it with: coop update"
+        out_line "  ${C_YEL}A Workshop update is available${C_OFF}. Install it with: coop update"
     fi
     out_line ""
 }
@@ -146,7 +146,7 @@ doctor_run() {
     # from a machine that has no server on it.
     if ! installation_present; then
         _hc fail "Installation" "Not installed" \
-            "no installation in $INSTALL_DIR - create one with: sudo coop install"
+            "no installation in $INSTALL_DIR. Create one with: sudo coop install"
     else
         _doctor_configuration
         _doctor_data
@@ -202,7 +202,7 @@ _doctor_system() {
     case "$COMPAT_STATUS" in
         supported)    _hc ok   "System" "Operating system" "$OS_NAME" ;;
         experimental) _hc warn "System" "Operating system" "$OS_NAME (experimental)" ;;
-        *)            _hc fail "System" "Operating system" "$OS_NAME - $COMPAT_REASON" ;;
+        *)            _hc fail "System" "Operating system" "$OS_NAME. $COMPAT_REASON" ;;
     esac
 
     if [[ "$SYS_ARCH" == "x86_64" || "$SYS_ARCH" == "amd64" ]]; then
@@ -221,8 +221,8 @@ _doctor_system() {
 
     local free; free="$(compat_disk_gb "$INSTALL_DIR")"
     if   (( free >= 10 )); then _hc ok   "System" "Disk space" "${free} GB free"
-    elif (( free >= 3 ));  then _hc warn "System" "Disk space" "${free} GB free - an update needs about 7 GB"
-    else                        _hc fail "System" "Disk space" "${free} GB free - too little to update or back up"
+    elif (( free >= 3 ));  then _hc warn "System" "Disk space" "${free} GB free, an update needs about 7 GB"
+    else                        _hc fail "System" "Disk space" "${free} GB free, too little to update or back up"
     fi
 
     if (( SYS_MEM_MB >= MIN_MEM_MB )); then
@@ -240,7 +240,7 @@ _doctor_docker() {
     if docker info >/dev/null 2>&1; then
         _hc ok "Docker" "Docker daemon" "$(compat_docker_version)"
     else
-        _hc fail "Docker" "Docker daemon" "not responding - try: systemctl status docker"
+        _hc fail "Docker" "Docker daemon" "not responding. Try: systemctl status docker"
         return
     fi
 
@@ -251,7 +251,7 @@ _doctor_docker() {
     if image_exists; then
         _hc ok "Docker" "Runtime image" "bannerlordcoop/server:$(cfg WINE_BRANCH)"
     else
-        _hc warn "Docker" "Runtime image" "not built yet - run: coop install"
+        _hc warn "Docker" "Runtime image" "not built yet. Run: coop install"
     fi
 }
 
@@ -259,7 +259,7 @@ _doctor_configuration() {
     if [[ -f "$FILE_CONFIG" ]]; then
         _hc ok "Configuration" "server.env" "$FILE_CONFIG"
     else
-        _hc fail "Configuration" "server.env" "not found - this host has no installation yet"
+        _hc fail "Configuration" "server.env" "not found, this host has no installation yet"
         return
     fi
 
@@ -267,7 +267,7 @@ _doctor_configuration() {
     if [[ "$perms" == "600" || "$perms" == "640" ]]; then
         _hc ok "Configuration" "File permissions" "$perms"
     else
-        _hc warn "Configuration" "File permissions" "$perms - the file holds the server password; 600 is expected"
+        _hc warn "Configuration" "File permissions" "$perms, the file holds the server password; 600 is expected"
     fi
 
     local key reason problems=0
@@ -280,13 +280,13 @@ _doctor_configuration() {
     if config_selfcheck >/dev/null 2>&1; then
         _hc ok "Configuration" "Defaults consistency" "spec and defaults.env agree"
     else
-        _hc warn "Configuration" "Defaults consistency" "defaults.env and the spec have drifted - reinstall the manager files"
+        _hc warn "Configuration" "Defaults consistency" "defaults.env and the spec have drifted. Reinstall the manager files"
     fi
 
     if [[ -f "$FILE_SERVER_JSON" ]]; then
         _hc ok "Configuration" "server-config.json" "generated"
     else
-        _hc fail "Configuration" "server-config.json" "missing - run: coop config --apply"
+        _hc fail "Configuration" "server-config.json" "missing. Run: coop config --apply"
     fi
 }
 
@@ -306,7 +306,7 @@ _doctor_data() {
         if [[ "$owner" == "$expect" ]]; then
             _hc ok "Data" "Ownership" "$owner"
         else
-            _hc warn "Data" "Ownership" "saves/ is owned by $owner, expected $expect - the container may not be able to write"
+            _hc warn "Data" "Ownership" "saves/ is owned by $owner, expected $expect, so the container may not be able to write"
         fi
     fi
 
@@ -317,23 +317,23 @@ _doctor_data() {
         [[ -f "${save%.sav}.json" ]] \
             || _hc warn "Data" "Campaign metadata" "$(cfg SAVE_NAME).json is missing beside the save"
     else
-        _hc warn "Data" "Campaign save" "no save named '$(cfg SAVE_NAME)' yet - a new world is created on first start"
+        _hc warn "Data" "Campaign save" "no save named '$(cfg SAVE_NAME)' yet, so a new world is created on first start"
     fi
 
     if [[ -f "$FILE_MOD_JSON" ]]; then
         _hc ok "Data" "Gameplay config" "mod-config.json present"
     else
-        _hc warn "Data" "Gameplay config" "mod-config.json not created yet - the mod writes it on first launch"
+        _hc warn "Data" "Gameplay config" "mod-config.json not created yet, the mod writes it on first launch"
     fi
 }
 
 _doctor_steam() {
     [[ "$(cfg INSTALL_CHANNEL)" == "workshop" ]] || {
-        _hc ok "Steam" "Channel" "custom build - Steam is not used"
+        _hc ok "Steam" "Channel" "custom build, so Steam is not used"
         return
     }
     if [[ -z "$(cfg STEAM_USERNAME)" ]]; then
-        _hc fail "Steam" "Account" "not configured - run: coop steam login"
+        _hc fail "Steam" "Account" "not configured. Run: coop steam login"
         return
     fi
     _hc ok "Steam" "Account" "$(cfg STEAM_USERNAME)"
@@ -348,7 +348,7 @@ _doctor_steam() {
     if [[ -d "$(workshop_item_dir)" ]]; then
         _hc ok "Steam" "Workshop files" "$(du -sh "$(workshop_item_dir)" 2>/dev/null | cut -f1)"
     else
-        _hc warn "Steam" "Workshop files" "not downloaded yet - run: coop update --force"
+        _hc warn "Steam" "Workshop files" "not downloaded yet. Run: coop update --force"
     fi
 }
 
@@ -380,23 +380,23 @@ _doctor_server() {
     elif container_running; then
         _hc fail "Server" "Game port" "UDP $(cfg GAME_PORT) is not bound although the container runs"
     else
-        _hc warn "Server" "Game port" "UDP $(cfg GAME_PORT) is not bound - the server is stopped"
+        _hc warn "Server" "Game port" "UDP $(cfg GAME_PORT) is not bound, the server is stopped"
     fi
     case "$(firewall_state)" in
         active)
-            _hc warn "Server" "Host firewall" "ufw is active, but it does not govern the published game port - Docker publishes past it"
+            _hc warn "Server" "Host firewall" "ufw is active, but it does not govern the published game port; Docker publishes past it"
             ;;
         inactive) _hc info "Server" "Host firewall" "ufw is installed but inactive" ;;
         absent)   _hc info "Server" "Host firewall" "no ufw on this host" ;;
         *)        _hc info "Server" "Host firewall" "could not be determined" ;;
     esac
-    _hc info "Server" "Reachability" "UDP $(cfg GAME_PORT) has to be open at your provider - that firewall is the one that counts"
+    _hc info "Server" "Reachability" "UDP $(cfg GAME_PORT) has to be open at your provider; that firewall is the one that counts"
 
     if container_exists; then
         local errors
         errors="$(container_logs_tail 300 | grep -ciE '^\[?(error|fatal)|Unhandled exception' || true)"
         if (( errors > 0 )); then
-            _hc warn "Server" "Recent log errors" "$errors error line(s) in the last 300 - see: coop logs"
+            _hc warn "Server" "Recent log errors" "$errors error line(s) in the last 300. See: coop logs"
         else
             _hc ok "Server" "Recent log errors" "none in the last 300 lines"
         fi
@@ -407,11 +407,11 @@ _doctor_backups() {
     local newest age days
     newest="$(_backup_all_files | head -1)"
     if [[ -z "$newest" ]]; then
-        _hc warn "Backups" "Last backup" "none yet - create one with: coop backup"
+        _hc warn "Backups" "Last backup" "none yet. Create one with: coop backup"
     else
         age=$(( $(date +%s) - $(stat -c %Y "$newest") ))
         days=$(( age / 86400 ))
-        if   (( days >= 7 )); then _hc warn "Backups" "Last backup" "$(human_duration "$age") ago - older than a week"
+        if   (( days >= 7 )); then _hc warn "Backups" "Last backup" "$(human_duration "$age") ago, older than a week"
         else                       _hc ok   "Backups" "Last backup" "$(basename "$newest"), $(human_duration "$age") ago"
         fi
     fi

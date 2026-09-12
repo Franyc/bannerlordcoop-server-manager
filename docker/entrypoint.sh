@@ -37,7 +37,7 @@ exec 3<>"$FIFO"
 log() { printf '[entrypoint] %s\n' "$*"; }
 
 graceful_stop() {
-    log "signal received - sending 'stop' to the server console"
+    log "signal received, sending 'stop' to the server console"
     printf 'stop\n' >&3
     local waited=0
     while kill -0 "$SRV" 2>/dev/null && (( waited < STOP_TIMEOUT )); do
@@ -46,7 +46,7 @@ graceful_stop() {
     done
 
     if kill -0 "$SRV" 2>/dev/null; then
-        log "no response after ${STOP_TIMEOUT}s - terminating"
+        log "no response after ${STOP_TIMEOUT}s, terminating"
         kill -TERM "$SRV" 2>/dev/null || true
         sleep 5
         kill -KILL "$SRV" 2>/dev/null || true
@@ -62,7 +62,7 @@ graceful_stop() {
 
 if [[ ! -f "$SERVER_EXE" ]]; then
     log "server executable not found: $SERVER_EXE"
-    log "the server files are missing - run 'coop update --force' on the host"
+    log "the server files are missing. Run 'coop update --force' on the host"
     exit 2
 fi
 

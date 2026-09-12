@@ -155,7 +155,7 @@ _explain_exit_code() {
     case "${1:-}" in
         2) out_line "    Exit 2: the save could not be loaded, or loading timed out." ;;
         3) out_line "    Exit 3: the server failed while running. See 'coop logs'." ;;
-        4) out_line "    Exit 4: the Coop assemblies do not match the release - files under"
+        4) out_line "    Exit 4: the Coop assemblies do not match the release. Files under"
            out_line "            Modules/Coop were modified. Try 'coop update --force' or"
            out_line "            'coop rollback'." ;;
         137) out_line "    Exit 137: the container was killed. This should not happen with the"
@@ -237,7 +237,7 @@ server_config_render() {
     # drifted apart - better to catch it here than at the next server start.
     if grep -q '@@[A-Z_]*@@' "${FILE_SERVER_JSON}.tmp"; then
         rm -f "${FILE_SERVER_JSON}.tmp"
-        fail "$EX_CONFIG" "Template placeholders were left unfilled - this is a bug in the manager."
+        fail "$EX_CONFIG" "Template placeholders were left unfilled. This is a bug in the manager."
     fi
 
     chown "$(cfg PUID):$(cfg PGID)" "${FILE_SERVER_JSON}.tmp" 2>/dev/null || true

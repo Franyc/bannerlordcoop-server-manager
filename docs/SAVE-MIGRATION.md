@@ -9,7 +9,7 @@ want this installation to host it.
 |---|---|
 | `<name>.sav` | Yes. The world itself. |
 | `<name>.json` | Yes in practice. Metadata; without it the server may not list the save. |
-| `mod-config.json` | Optional. Gameplay settings - difficulty, world ageing. |
+| `mod-config.json` | Optional. Gameplay settings such as difficulty and world ageing. |
 
 The `.sav` and `.json` are a pair. Copy both.
 
@@ -78,7 +78,7 @@ Import campaign saves
   Source: /tmp/incoming
 
   + MyCampaign                   save and metadata present
-  ! OldRun                       no matching OldRun.json - the server may not list it
+  ! OldRun                       no matching OldRun.json, so the server may not list it
 
   Existing saves in /srv/bannerlordcoop/saves will be overwritten where names match.
 
@@ -100,9 +100,9 @@ sudo coop start
 coop status
 ```
 
-`Campaign` must show your campaign's date, not `Summer 1, 1084` - that is
-the date of a freshly created world, and seeing it means the server
-started a new game instead of loading yours. If that happens, the name in
+`Campaign` must show your campaign's date, not `Summer 1, 1084`. That is
+the date of a freshly created world, so seeing it means the server started
+a new game instead of loading yours. If that happens, the name in
 `SAVE_NAME` does not match a file in `saves/`.
 
 ```bash
@@ -131,7 +131,7 @@ rm -rf /tmp/incoming
 
 ## From another Bannerlord Coop server
 
-If the other machine runs this manager, use a backup - it carries the
+If the other machine runs this manager, use a backup. It carries the
 saves, the server configuration and the gameplay settings together, which
 is exactly the set you need:
 

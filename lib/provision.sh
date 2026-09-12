@@ -111,8 +111,8 @@ provision_collect_advanced() {
 
     out_title "Updates"
     out_line "  Automatic updates are off by default because every player must run"
-    out_line "  the same Coop build - an unattended update locks out anyone who has"
-    out_line "  not updated their client."
+    out_line "  the same Coop build, so an unattended update locks out anyone who"
+    out_line "  has not updated their client."
     out_line ""
     ask value "Check for updates on a schedule (true/false)" "$(cfg UPDATE_CHECK_ENABLED)"
     cfg_set UPDATE_CHECK_ENABLED "$value"
@@ -130,7 +130,7 @@ provision_summary() {
     out_kv "Instance"          "$INSTANCE_ID"
     out_kv "Directory"         "$INSTALL_DIR"
     out_kv "Campaign"          "$(cfg SAVE_NAME)"
-    out_kv "Password"          "$( [[ -n "$(cfg SERVER_PASSWORD)" ]] && printf 'set' || printf 'none - anyone with the address can join' )"
+    out_kv "Password"          "$( [[ -n "$(cfg SERVER_PASSWORD)" ]] && printf 'set' || printf 'none, anyone with the address can join' )"
     out_kv "Game port"         "UDP $(cfg GAME_PORT)"
     out_kv "Install channel"   "$(cfg INSTALL_CHANNEL)"
     out_kv "Steam account"     "$( [[ -n "$(cfg STEAM_USERNAME)" ]] && cfg STEAM_USERNAME || printf 'not set' )"
@@ -218,7 +218,7 @@ provision_run() {
 # ---------------------------------------------------------------- systemd --
 provision_install_units() {
     if ! systemd_available; then
-        warn "No systemd on this host - scheduled backups and update checks are not installed."
+        warn "No systemd on this host. Scheduled backups and update checks are not installed."
         out_line "    Run 'coop backup' and 'coop update --check' from your own scheduler."
         return 0
     fi

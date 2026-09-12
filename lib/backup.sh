@@ -107,9 +107,9 @@ backup_create() {
     # A backup of a running server must capture the current state, not the
     # last autosave.
     if container_running && server_is_serving; then
-        server_save || warn "Save not confirmed - backing up what is on disk."
+        server_save || warn "Save not confirmed. Backing up what is on disk."
     else
-        log "Server is not serving - backing up the state on disk."
+        log "Server is not serving. Backing up the state on disk."
     fi
 
     stamp="$(date +%Y%m%d-%H%M%S)"
@@ -573,7 +573,7 @@ backup_import_save() {
         if [[ -f "$json" ]]; then
             out_check ok "$(printf '%-28s %s' "$base" "save and metadata present")"
         else
-            out_check warn "$(printf '%-28s %s' "$base" "no matching ${base}.json - the server may not list it")"
+            out_check warn "$(printf '%-28s %s' "$base" "no matching ${base}.json, so the server may not list it")"
         fi
     done < <(find "$src" -maxdepth 1 -name '*.sav' -type f | sort)
     out_line ""

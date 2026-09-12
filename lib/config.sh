@@ -36,14 +36,14 @@ declare -gA CFG_OVERRIDE=() # values from the command line, applied last
 declare -gA CONFIG_SPEC=(
     [INSTANCE_ID]="identifier|install|Identifier for this installation. Shapes the container, lock and systemd unit names, so one host can run more than one server."
     [INSTALL_DIR]="path|install|Absolute path holding all persistent data for this installation."
-    [SERVER_LABEL]="string|no|Name used by the manager in status output and backup manifests. Not visible to joining players - the game has no server name field."
+    [SERVER_LABEL]="string|no|Name used by the manager in status output and backup manifests. Not visible to joining players, because the game has no server name field."
 
     [INSTALL_CHANNEL]="enum:workshop,custom|install|Where the server files come from. 'workshop' downloads from the Steam Workshop; 'custom' installs from a local directory."
     [WORKSHOP_APP_ID]="int|install|Steam application ID of Mount & Blade II: Bannerlord."
     [WORKSHOP_ITEM_ID]="int|install|Steam Workshop item ID of the Bannerlord Coop dedicated server."
     [CUSTOM_SOURCE_PATH]="path|install|Directory holding the server files. Only used when INSTALL_CHANNEL=custom."
 
-    [STEAM_USERNAME]="string|no|Steam account used to download the Workshop item. The password is never stored - only Steam's own session, under state/steam."
+    [STEAM_USERNAME]="string|no|Steam account used to download the Workshop item. The password is never stored, only Steam's own session under state/steam."
 
     [SAVE_NAME]="string|yes|Campaign save to host. An existing save of this name is loaded; otherwise a fresh world is created and saved under it."
     [SERVER_PASSWORD]="string|yes|Password players must enter to join. Empty means anyone who knows the address can join."

@@ -14,9 +14,9 @@ playable state:
 Plus two descriptions of the archive itself: `manifest.json` for machines
 and `BACKUP-INFO.txt` for people.
 
-Everything else - the server files, the Workshop download, the rollback
-copy, the container image - can be produced again from Steam and this
-repository. These three cannot.
+Everything else can be produced again from Steam and this repository: the
+server files, the Workshop download, the rollback copy, the container
+image. These three cannot.
 
 > **A backup archive contains `server.env`, and therefore your server
 > password.** Archives are written with mode `0600`. Treat them as secrets.
@@ -35,9 +35,9 @@ The note is stored in the manifest and shown in the listing, which is what
 makes a backup findable three weeks later.
 
 If the server is running and serving, a save is **forced first** and the
-manager waits for the file on disk to actually change - not for a fixed
-number of seconds. Without that the backup would capture the last autosave
-rather than the current state.
+manager waits for the file on disk to actually change, rather than for a
+fixed number of seconds. Without that the backup would capture the last
+autosave rather than the current state.
 
 ## Automatic backups
 
@@ -64,21 +64,20 @@ is connected**:
 Automatic backup skipped: the campaign is unchanged and nobody is connected.
 ```
 
-The campaign date is the signal, not the save file. That is not an obvious
-choice, so it is worth saying why it is the right one.
+The campaign date is the signal, not the save file, and the reason is worth
+knowing.
 
-The first version compared a checksum of the `.sav`, and it almost never
-matched: the server autosaves every few minutes whether or not the world is
-moving, so the file changes while the campaign stands still. Measured over
-one night on a completely idle server - 23 timer runs, 21 full backups,
-480 MB of byte-different copies of a world that had not advanced by a
-single day.
+A checksum of the `.sav` almost never matches. The server autosaves every
+few minutes whether or not the world is moving, so the file changes while
+the campaign stands still. On an idle server that produces a full backup
+every hour, each one a byte-different copy of a world that has not advanced
+by a single day.
 
-The campaign date does not have that problem. It only moves while players
+The campaign date does not have that problem. It moves only while players
 are connected, because the campaign pauses without them, and Bannerlord
 time runs fast enough that any real session changes it. When the server is
-stopped there is no campaign date to read, and the checksum is used
-instead - there the file genuinely does sit still.
+stopped there is no campaign date to read, so the checksum is used instead.
+There the file genuinely does sit still.
 
 ## Backup types
 
@@ -107,8 +106,8 @@ you took deliberately before a restore.
 
 An archive runs 12-25 MB depending on how grown the campaign is, so the
 defaults hold a couple of days of history plus everything you asked for by
-hand - and on an idle server the hourly run is skipped, so those two days
-stretch as far as the server sits unused.
+hand. On an idle server the hourly run is skipped, so that window stretches
+as far as the server sits unused.
 
 ## Listing
 
@@ -138,8 +137,8 @@ coop backup list --json | jq -r '.backups[] | select(.type=="manual") | .id'
 coop backup info 20260911-004626
 ```
 
-Shows the manifest - campaign name, campaign date, Coop build, manager
-version - and every save inside the archive, without unpacking anything.
+Shows the manifest (campaign name, campaign date, Coop build, manager
+version) and every save inside the archive, without unpacking anything.
 
 ## Restoring
 
@@ -156,7 +155,7 @@ coop backup restore 20260911-004626 --non-interactive --yes
 Unpacking an archive over a live installation would leave a mixture of old
 and new campaign files if anything went wrong halfway through. So:
 
-1. The archive is resolved **within the backup directory only** - never
+1. The archive is resolved **within the backup directory only**, never
    from an arbitrary path.
 2. It is validated: a readable gzip tar, no absolute or traversing paths,
    no entries outside `saves/`, `config/` and `coopdata/`, and a `saves/`

@@ -40,7 +40,7 @@ authentication, summary, installation, start, validation. Nothing is
 changed until after the summary is confirmed.
 
 Running it again on an existing installation offers update, repair,
-reconfigure or exit - it never silently overwrites a campaign.
+reconfigure or exit. It never silently overwrites a campaign.
 
 ```bash
 sudo coop install --advanced
@@ -100,7 +100,7 @@ A change to a setting marked "restart required" offers a restart; in
 | `coop steam logout` | yes | Discard the stored session |
 
 `coop update --check` exits **0 when the check succeeded**, and says in its
-output whether an update exists - the same convention every other tool
+output whether an update exists, which is the convention every other tool
 follows. Scripts that prefer it as an exit code add `--exit-status` and get
 100 when one is available.
 
@@ -136,8 +136,8 @@ coop backup restore 20260911-004626
 | `coop doctor` | no | Check everything and say what is wrong. `--json`. |
 | `coop version` | no | Manager and Coop versions. `--json`. |
 
-`coop doctor` exits 50 if anything failed, 0 otherwise - warnings alone do
-not make it fail.
+`coop doctor` exits 50 if anything failed and 0 otherwise. Warnings alone
+do not make it fail.
 
 ## Exit codes
 

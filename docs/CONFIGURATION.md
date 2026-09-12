@@ -9,7 +9,7 @@ Everything about one installation is described by a single file:
 It is plain `KEY="value"` lines with comments, and it is meant to be edited
 by hand. Two other files in the same directory are **generated** from it -
 `server-config.json` for the game server and `compose.env` for Docker
-Compose - and your edits to those would be overwritten.
+Compose. Edits to those two are overwritten.
 
 ## Changing a setting
 
@@ -38,10 +38,10 @@ Three shorter aliases exist for convenience: `--password`, `--channel` and
 
 When the same setting is given in more than one place, the later one wins:
 
-1. `config/defaults.env` in this repository - the project defaults
-2. `$INSTALL_DIR/config/server.env` - your installation
-3. `--config <file>` - a supplied file
-4. Command-line flags - highest
+1. `config/defaults.env` in this repository, the project defaults
+2. `$INSTALL_DIR/config/server.env`, your installation
+3. `--config <file>`, a supplied file
+4. Command-line flags, which win over everything above
 
 Values from the command line are validated immediately, because you can fix
 a typo on the spot. Values already on disk are reported by `coop doctor`
@@ -67,7 +67,7 @@ provisioning system to write from data it did not author.
 ## Secrets
 
 `server.env` contains `SERVER_PASSWORD` and is written with mode `0600`.
-Backups include it, so **backup archives are secrets too** - they are
+Backups include it, so **backup archives are secrets too**. They are
 written `0600` as well.
 
 Your Steam password is not in this file, or in any other. Only Steam's own
@@ -99,12 +99,12 @@ session lives under `state/steam`. See [STEAM.md](STEAM.md).
 | `PGID` | `1000` | int | Yes | Group ID owning the data directories. |
 | `PUID` | `1000` | int | Yes | User ID owning the data directories and running the server process. |
 | `SAVE_NAME` | `Campaign` | string | Yes | Campaign save to host. An existing save of this name is loaded; otherwise a fresh world is created and saved under it. |
-| `SERVER_LABEL` | `Bannerlord Coop Server` | string | No | Name used by the manager in status output and backup manifests. Not visible to joining players - the game has no server name field. |
+| `SERVER_LABEL` | `Bannerlord Coop Server` | string | No | Name used by the manager in status output and backup manifests. Not visible to joining players, because the game has no server name field. |
 | `SERVER_LOG_FILE` | `true` | bool | Yes | Write the server's output to a file per launch in logs/, in addition to the container log. |
 | `SERVER_PASSWORD` | _(empty)_ | string | Yes | Password players must enter to join. Empty means anyone who knows the address can join. |
 | `STEAMCMD_IMAGE` | `steamcmd/steamcmd:ubuntu` | string | No | Container image used to run SteamCMD. Pin it to a digest for reproducible installs. |
 | `STEAM_ADVERTISE` | `false` | bool | Yes | Advertise the server in a public Steam lobby when a logged-in Steam client runs on the host. Off means direct connect only. |
-| `STEAM_USERNAME` | _(empty)_ | string | No | Steam account used to download the Workshop item. The password is never stored - only Steam's own session, under state/steam. |
+| `STEAM_USERNAME` | _(empty)_ | string | No | Steam account used to download the Workshop item. The password is never stored, only Steam's own session under state/steam. |
 | `TIMEZONE` | `system` | string | Yes | Time zone inside the container. 'system' adopts the host's zone. |
 | `UPDATE_CHECK_ENABLED` | `true` | bool | No | Check for new Workshop versions on a schedule and report them. |
 | `UPDATE_CHECK_SCHEDULE` | `*-*-* 04:00:00` | schedule | No | When the update check runs, as a systemd OnCalendar expression. |
@@ -123,7 +123,7 @@ step. Regenerate it with `tools/gen-config-docs.sh --write`.
 
 The campaign to host. If a save of that name exists in `saves/`, it is
 loaded. If not, the server creates a fresh world and saves it under that
-name. Changing it points the server at a different campaign - it does not
+name. Changing it points the server at a different campaign. It does not
 rename anything.
 
 ### `SERVER_LABEL`
@@ -150,7 +150,7 @@ own client yet. The scheduled check still runs and reports.
 ### `MEMORY_LIMIT`
 
 Empty means no limit. Measured usage is 1.2-1.6 GB. On a small host a limit
-is worth setting anyway - not because the server needs it, but so that a
+is worth setting anyway, not because the server needs it, but so that a
 runaway process cannot take the whole machine, and your SSH session, down
 with it.
 
@@ -172,7 +172,7 @@ discard your choice.
 
 Four counts, one per reason, plus an age limit and a total size cap:
 
-- Automatic backups are a rolling window - the count, the age limit and the
+- Automatic backups are a rolling window. The count, the age limit and the
   size cap all apply to them.
 - Manual and pre-restore backups exist because somebody decided to make
   them. They are only ever removed by their own count limit, never by the

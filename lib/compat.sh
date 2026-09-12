@@ -291,8 +291,8 @@ compat_preflight() {
     # -- operating system -----------------------------------------------
     case "$COMPAT_STATUS" in
         supported)    _check ok   "Operating system" "$OS_NAME" ;;
-        experimental) _check warn "Operating system" "$OS_NAME - experimental. $COMPAT_REASON"; worst=1 ;;
-        unsupported)  _check fail "Operating system" "$OS_NAME - unsupported. $COMPAT_REASON"; worst=2 ;;
+        experimental) _check warn "Operating system" "$OS_NAME, experimental. $COMPAT_REASON"; worst=1 ;;
+        unsupported)  _check fail "Operating system" "$OS_NAME, unsupported. $COMPAT_REASON"; worst=2 ;;
     esac
     if [[ "$SYS_ARCH" == "x86_64" || "$SYS_ARCH" == "amd64" ]]; then
         _check ok   "Architecture" "$SYS_ARCH"
@@ -310,7 +310,7 @@ compat_preflight() {
 
     # -- package manager and dependencies ---------------------------------
     if [[ "$PKG_MANAGER" == "unknown" ]]; then
-        _check warn "Package manager" "none recognised - dependencies must be installed by hand"
+        _check warn "Package manager" "none recognised, so dependencies must be installed by hand"
         (( worst < 1 )) && worst=1
     else
         _check ok "Package manager" "$PKG_MANAGER"
@@ -344,30 +344,30 @@ compat_preflight() {
             _check fail "Docker Engine" "installed ($dver) but the daemon is not reachable"; worst=2
         fi
     else
-        _check todo "Docker Engine" "not installed - will be installed from Docker's own repository"
+        _check todo "Docker Engine" "not installed, will be installed from Docker's own repository"
     fi
 
     cver="$(compat_compose_version)"
     if [[ -n "$cver" ]]; then
         _check ok "Docker Compose" "$cver"
     else
-        _check todo "Docker Compose" "compose plugin missing - will be installed"
+        _check todo "Docker Compose" "compose plugin missing, will be installed"
     fi
 
     # -- resources ---------------------------------------------------------
     if   (( SYS_MEM_MB >= REC_MEM_MB )); then _check ok   "Memory" "${SYS_MEM_MB} MB"
-    elif (( SYS_MEM_MB >= MIN_MEM_MB )); then _check warn "Memory" "${SYS_MEM_MB} MB - runs, but ${REC_MEM_MB} MB is recommended"; (( worst < 1 )) && worst=1
-    else _check fail "Memory" "${SYS_MEM_MB} MB - at least ${MIN_MEM_MB} MB is required"; worst=2
+    elif (( SYS_MEM_MB >= MIN_MEM_MB )); then _check warn "Memory" "${SYS_MEM_MB} MB, runs but ${REC_MEM_MB} MB is recommended"; (( worst < 1 )) && worst=1
+    else _check fail "Memory" "${SYS_MEM_MB} MB, at least ${MIN_MEM_MB} MB is required"; worst=2
     fi
 
     if   (( SYS_DISK_GB >= REC_DISK_GB )); then _check ok   "Disk space" "${SYS_DISK_GB} GB free at $(_existing_ancestor "$install_dir")"
-    elif (( SYS_DISK_GB >= MIN_DISK_GB )); then _check warn "Disk space" "${SYS_DISK_GB} GB free - tight; ${REC_DISK_GB} GB is recommended"; (( worst < 1 )) && worst=1
-    else _check fail "Disk space" "${SYS_DISK_GB} GB free - at least ${MIN_DISK_GB} GB is required (game files are about 18 GB across three directories)"; worst=2
+    elif (( SYS_DISK_GB >= MIN_DISK_GB )); then _check warn "Disk space" "${SYS_DISK_GB} GB free, tight; ${REC_DISK_GB} GB is recommended"; (( worst < 1 )) && worst=1
+    else _check fail "Disk space" "${SYS_DISK_GB} GB free, at least ${MIN_DISK_GB} GB is required (game files are about 18 GB across three directories)"; worst=2
     fi
 
     if   (( SYS_CORES >= REC_CORES )); then _check ok   "CPU cores" "$SYS_CORES"
-    elif (( SYS_CORES >= MIN_CORES )); then _check warn "CPU cores" "$SYS_CORES - workable; ${REC_CORES} is recommended"; (( worst < 1 )) && worst=1
-    else _check fail "CPU cores" "$SYS_CORES - the server alone needs about 1.2 cores even with no players"; worst=2
+    elif (( SYS_CORES >= MIN_CORES )); then _check warn "CPU cores" "$SYS_CORES, workable; ${REC_CORES} is recommended"; (( worst < 1 )) && worst=1
+    else _check fail "CPU cores" "$SYS_CORES, the server alone needs about 1.2 cores even with no players"; worst=2
     fi
 
     # -- ports -------------------------------------------------------------

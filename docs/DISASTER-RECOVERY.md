@@ -5,7 +5,7 @@ Rebuilding from nothing: a new machine, and a backup.
 ## What you need
 
 1. This repository
-2. **A backup archive** - without one, the campaign is gone
+2. **A backup archive.** Without one, the campaign is gone
 3. Steam credentials for an account that owns Bannerlord
 
 > Everything except the backup can be produced again from Steam and this
@@ -49,9 +49,9 @@ cd bannerlordcoop-server-manager
 sudo ./install.sh
 ```
 
-Answer the questions with whatever you like for now - the restore will
-replace the campaign name, the password and every other setting with the
-ones from the backup. If you want to skip straight past them:
+Answer the questions with whatever you like for now. The restore replaces
+the campaign name, the password and every other setting with the ones from
+the backup. If you want to skip straight past them:
 
 ```bash
 sudo coop steam login
@@ -85,8 +85,8 @@ backup of the empty world it is about to replace, swaps the directories in,
 fixes ownership for this host, reloads the configuration, regenerates the
 files the server reads, and starts again.
 
-Your old settings - campaign name, password, port, backup policy - come
-back with it, because `server.env` is part of the archive.
+Your old settings come back with it, because `server.env` is part of the
+archive: campaign name, password, port, backup policy.
 
 ## 5. Verify
 
@@ -118,7 +118,7 @@ coop doctor
 The new machine has a new address. Allow **UDP 4200** at your provider, and
 tell your players the new address.
 
-Remember that `ufw` does not govern published container ports - your
+Remember that `ufw` does not govern published container ports. Your
 provider's firewall is the one that counts.
 
 ## If the password should change
@@ -152,7 +152,7 @@ sudo coop config --set SAVE_NAME="MyCampaign"
 sudo coop start
 ```
 
-Do not copy the old `config/` wholesale onto a new installation - it
+Do not copy the old `config/` wholesale onto a new installation. It
 contains paths and user IDs from the old host. Set the settings you care
 about with `coop config --set` instead.
 
@@ -173,7 +173,7 @@ from Steam and this repository. `logs/` is history, not state. `state/`
 holds installation metadata and the Steam session, both of which are
 recreated by an install and a login.
 
-Only `saves/`, `config/` and `coopdata/` are irreplaceable - which is
+Only `saves/`, `config/` and `coopdata/` are irreplaceable, which is
 exactly what a backup archive contains.
 
 ## Testing your recovery
