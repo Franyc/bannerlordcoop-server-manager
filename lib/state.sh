@@ -60,10 +60,15 @@ state_set() {
 
 state_exists() { [[ -f "$FILE_STATE" ]]; }
 
-# Is there an installation here at all? Judged by the data, not by the
-# state file alone - somebody may have deleted it.
+# Is there an installation here at all?
+#
+# Judged by evidence that provisioning actually happened: the state file
+# written by provision_run, or server files on disk. A server.env alone is
+# not enough - `coop steam login` creates one on a bare host before
+# anything is installed, and treating that as an installation would send
+# the very next `coop install` into the "existing installation" menu.
 installation_present() {
-    [[ -d "$INSTALL_DIR" ]] && { state_exists || server_installed || [[ -f "$FILE_CONFIG" ]]; }
+    [[ -d "$INSTALL_DIR" ]] && { state_exists || server_installed; }
 }
 
 # ------------------------------------------------------------ update marker --

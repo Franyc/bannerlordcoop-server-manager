@@ -141,6 +141,15 @@ provision_run() {
         || fail "$EX_RUNTIME" "Could not create $INSTALL_DIR"
     chown -R "$(cfg PUID):$(cfg PGID)" "$INSTALL_DIR" 2>/dev/null || true
     chmod 0750 "$INSTALL_DIR"
+
+    # One exception to the sweep above: state/steam is mounted over the
+    # SteamCMD image's own /root/.local/share/Steam, so it holds SteamCMD's
+    # installation as well as the session - and that container runs as
+    # root. Handing it to the service user makes the next download fail
+    # with "Couldn't create cache directory ... error 13", which looks
+    # exactly like an expired session and is not.
+    chown -R root:root "$DIR_STEAM" 2>/dev/null || true
+    chmod 0700 "$DIR_STEAM" 2>/dev/null || true
     log_open "$INSTALL_DIR"
     ok "$INSTALL_DIR"
 

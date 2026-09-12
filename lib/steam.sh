@@ -73,8 +73,11 @@ steam_status() {
     fi
 
     local out
-    out="$(_steamcmd -- +login "$(cfg STEAM_USERNAME)" +quit 2>&1)" || true
-    if grep -qiE 'Logged in OK|Waiting for (user info|client config)' <<<"$out"; then
+    out="$(_steamcmd -- +login "$(cfg STEAM_USERNAME)" +quit 2>&1 | _steam_clean)" || true
+    # "Logging in using cached credentials" means success; "Cached
+    # credentials not found" means the opposite. Matching the bare phrase
+    # would read the failure as a success, so the verb has to be in it.
+    if grep -qiE 'Logging in using cached credentials|Logged in OK|Waiting for (user info|client config)' <<<"$out"; then
         printf 'valid'
     elif grep -qiE 'Login Failure|Cached credentials not found|two-factor|Steam Guard|password:' <<<"$out"; then
         printf 'expired'
@@ -173,11 +176,24 @@ steam_logout() {
     ok "Steam session removed. The next download will need 'coop steam login'."
 }
 
-# SteamCMD runs as root inside its container, so everything it writes lands
-# as root on the host. Hand it back to the service user.
+# The downloaded Workshop files are read by the game server, which runs as
+# the service user, so those have to change hands.
+#
+# The session directory must NOT. It is mounted over the image's own
+# /root/.local/share/Steam, which means it holds SteamCMD's installation as
+# well as the session - and SteamCMD runs as root in that container.
+# Chowning it away from root makes the next run die with
+# "Couldn't create cache directory ... error 13", which looks for all the
+# world like an expired session and is not.
 _steam_fix_ownership() {
-    chown -R "$(cfg PUID):$(cfg PGID)" "$DIR_STEAM" "$DIR_WORKSHOP" 2>/dev/null || true
+    chown -R "$(cfg PUID):$(cfg PGID)" "$DIR_WORKSHOP" 2>/dev/null || true
 }
+
+# Strips the colour codes SteamCMD writes even when not on a terminal.
+# Every pattern below is matched against the cleaned text, because
+# "Logging in user ... to Steam Public...<esc>[0mOK" does not contain the
+# literal string a naive match would look for.
+_steam_clean() { sed -e 's/\x1b\[[0-9;]*[a-zA-Z]//g'; }
 
 # ---------------------------------------------------------------- download --
 workshop_item_dir() {
@@ -208,7 +224,7 @@ steam_download() {
     local out rc=0
     out="$(_steamcmd -- +login "$user" \
             +workshop_download_item "$(cfg WORKSHOP_APP_ID)" "$(cfg WORKSHOP_ITEM_ID)" validate \
-            +quit 2>&1)" || rc=$?
+            +quit 2>&1 | _steam_clean)" || rc=$?
 
     printf '%s\n' "$out" | tail -6 >&2
     _steam_fix_ownership
