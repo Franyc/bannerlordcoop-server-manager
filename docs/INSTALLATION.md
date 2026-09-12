@@ -6,6 +6,7 @@
 |---|---|
 | Architecture | **x86_64 only** |
 | Operating system | Linux with a current Docker Engine and systemd |
+| CPU | 2 cores minimum, 4 recommended - the server uses ~1.2 cores when idle |
 | Memory | 4 GB minimum, 8 GB recommended |
 | Disk | 25 GB minimum, 40 GB recommended |
 | Privileges | root |

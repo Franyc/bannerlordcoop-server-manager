@@ -23,7 +23,7 @@
 # Detection results, filled by compat_detect().
 OS_ID=""; OS_VERSION=""; OS_NAME=""; OS_LIKE=""
 SYS_ARCH=""; SYS_KERNEL=""; SYS_INIT=""; PKG_MANAGER=""
-SYS_MEM_MB=0; SYS_DISK_GB=0
+SYS_MEM_MB=0; SYS_DISK_GB=0; SYS_CORES=0
 COMPAT_STATUS=""          # supported | experimental | unsupported
 COMPAT_REASON=""
 
@@ -47,6 +47,12 @@ readonly MIN_MEM_MB=3800
 readonly REC_MEM_MB=6800
 readonly MIN_DISK_GB=25
 readonly REC_DISK_GB=40
+
+# Measured with no players connected and the campaign paused: the server
+# still uses about 1.2 cores. It does not idle down, so a single-core host
+# is saturated before anybody joins.
+readonly MIN_CORES=2
+readonly REC_CORES=4
 
 # ---------------------------------------------------------------- detection --
 compat_detect() {
@@ -74,6 +80,7 @@ compat_detect() {
     else PKG_MANAGER="unknown"; fi
 
     SYS_MEM_MB=$(( $(awk '/^MemTotal:/{print $2}' /proc/meminfo 2>/dev/null || echo 0) / 1024 ))
+    SYS_CORES="$(nproc 2>/dev/null || echo 1)"
 }
 
 # The first existing ancestor of the install path - free space has to be
@@ -305,6 +312,11 @@ compat_preflight() {
     if   (( SYS_DISK_GB >= REC_DISK_GB )); then _check ok   "Disk space" "${SYS_DISK_GB} GB free at $(_existing_ancestor "$install_dir")"
     elif (( SYS_DISK_GB >= MIN_DISK_GB )); then _check warn "Disk space" "${SYS_DISK_GB} GB free - tight; ${REC_DISK_GB} GB is recommended"; (( worst < 1 )) && worst=1
     else _check fail "Disk space" "${SYS_DISK_GB} GB free - at least ${MIN_DISK_GB} GB is required (game files are about 18 GB across three directories)"; worst=2
+    fi
+
+    if   (( SYS_CORES >= REC_CORES )); then _check ok   "CPU cores" "$SYS_CORES"
+    elif (( SYS_CORES >= MIN_CORES )); then _check warn "CPU cores" "$SYS_CORES - workable; ${REC_CORES} is recommended"; (( worst < 1 )) && worst=1
+    else _check fail "CPU cores" "$SYS_CORES - the server alone needs about 1.2 cores even with no players"; worst=2
     fi
 
     # -- ports -------------------------------------------------------------

@@ -40,7 +40,8 @@ coop status
 |---|---|
 | Architecture | **x86_64 only.** The server is a Windows x64 binary run under Wine; arm64 would need an emulation layer this installer will not set up. |
 | Operating system | A Linux distribution with a current Docker Engine and systemd - see below |
-| Memory | 4 GB minimum, 8 GB recommended (the server itself uses 1.2-1.6 GB) |
+| CPU | **2 cores minimum, 4 recommended.** The server uses about 1.2 cores even with nobody connected - it does not idle down. |
+| Memory | 4 GB minimum, 8 GB recommended (the server uses 0.9-1.6 GB) |
 | Disk | 25 GB minimum, 40 GB recommended. The game files occupy about 18 GB across three directories, plus backups. |
 | Network | UDP 4200 reachable from the internet |
 | Steam | An account that **owns Mount & Blade II: Bannerlord**. The Workshop download is not available anonymously. |

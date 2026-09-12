@@ -43,8 +43,11 @@ player_list() { ds_event players | jq -r '.list[]? // empty' 2>/dev/null || true
 server_version() {
     local f="$DIR_SERVER/release-info.txt" built game
     [[ -f "$f" ]] || { printf 'not installed'; return 0; }
-    built="$(sed -n 's/^Built:[[:space:]]*//p'        "$f" | head -1)"
-    game="$(sed -n 's/^Game version:[[:space:]]*//p'  "$f" | head -1)"
+    # The file ships with a Windows build and has CRLF line endings. A
+    # trailing carriage return is invisible in a terminal but travels into
+    # the JSON backup manifest and the status output, where it is not.
+    built="$(sed -n 's/^Built:[[:space:]]*//p'        "$f" | tr -d '\r' | head -1)"
+    game="$(sed -n 's/^Game version:[[:space:]]*//p'  "$f" | tr -d '\r' | head -1)"
     printf 'build %s / %s' "${built:-unknown}" "${game:-unknown}"
 }
 
@@ -127,7 +130,12 @@ server_start() {
     local rc=0
     wait_serving "$timeout" || rc=$?
     case "$rc" in
-        0) ok "Server is serving ('$(cfg SAVE_NAME)', $(pulse_time))"; return 0 ;;
+        0) # The campaign date comes from the pulse line, which has not
+           # necessarily been printed yet the moment the server starts
+           # serving - so it is appended only when there is one.
+           local when; when="$(pulse_time)"
+           ok "Server is serving ('$(cfg SAVE_NAME)'${when:+, $when})"
+           return 0 ;;
         3) # Mid-restart, the reported exit code is whatever Docker happened
            # to be holding, so it is not worth printing. The log is.
            warn "The server is not starting: the container exits at once and Docker keeps restarting it."

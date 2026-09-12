@@ -219,8 +219,8 @@ exits 70 rather than waiting.
 
 | | |
 |---|---|
-| Memory | 1.2-1.6 GB |
-| CPU | 30-50% of one core when idle |
+| Memory | 0.9-1.6 GB - about 890 MB on a fresh world, 1.2-1.6 GB on a grown campaign |
+| CPU | about 1.2 cores, with or without players |
 | Bandwidth | about 58 KB/s per player |
 | Campaign load time | about 2 minutes for a grown save |
 | Workshop item | about 6.1 GB |
@@ -230,6 +230,12 @@ exits 70 rather than waiting.
 With no players connected the campaign pauses on its own, so the server can
 be left running around the clock - and an hourly backup of an idle server
 costs one checksum.
+
+**The process does not idle down, though.** Measured over five samples on a
+four-core machine with nobody connected and the campaign paused: 120-122%
+CPU, steady. That is the server's own loop, not the campaign, and it is why
+the requirements ask for two cores rather than one. A single-core host is
+saturated before the first player joins.
 
 ## Harmless log messages
 

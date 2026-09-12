@@ -171,7 +171,7 @@ rollback_apply() {
 _rollback_version() {
     local f="$DIR_ROLLBACK/release-info.txt" built
     [[ -f "$f" ]] || { printf 'unknown'; return; }
-    built="$(sed -n 's/^Built:[[:space:]]*//p' "$f" | head -1)"
+    built="$(sed -n 's/^Built:[[:space:]]*//p' "$f" | tr -d '\r' | head -1)"
     printf 'build %s' "${built:-unknown}"
 }
 

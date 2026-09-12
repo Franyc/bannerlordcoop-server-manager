@@ -496,8 +496,9 @@ backup_restore() {
     # 8. start and verify
     if server_start; then
         ok "Restore complete"
+        local when; when="$(pulse_time)"
         out_line ""
-        out_line "  Campaign : $(cfg SAVE_NAME)  $(pulse_time)"
+        out_line "  Campaign : $(cfg SAVE_NAME)${when:+  $when}"
         out_line "  Backup   : $(basename "$archive")"
         out_line ""
         return 0
