@@ -7,7 +7,7 @@
 | Architecture | **x86_64 only** |
 | Operating system | Linux with a current Docker Engine and systemd |
 | CPU | 2 cores minimum, 4 recommended. The server uses about 1.2 cores when idle |
-| Memory | 4 GB minimum, 8 GB recommended |
+| Memory | 4 GB minimum, 8 GB recommended. The check reads what the kernel reports, which is noticeably less than the amount fitted |
 | Disk | 25 GB minimum, 40 GB recommended |
 | Privileges | root |
 | Network | Outbound to Steam, Docker and WineHQ; inbound UDP 4200 |

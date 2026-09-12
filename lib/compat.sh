@@ -41,9 +41,15 @@ readonly REQUIRED_PACKAGES_DNF=(ca-certificates curl git jq rsync tar unzip util
 # the server itself uses 1.2-1.6 GB, and the Workshop item is ~6.1 GB held
 # in three places (workshop/, server/, rollback/) plus backups.
 # Thresholds are set against what a machine actually reports, not against
-# the number on the invoice: the kernel and firmware take their cut, so a
-# host with 8 GB fitted reports about 7.4 GB and one with 4 GB about 3.9.
-readonly MIN_MEM_MB=3800
+# the number on the invoice, and the gap is bigger than it looks. Two hosts
+# given exactly 4 GB reported 3327 MB and 3850 MB: the kernel, firmware and
+# reserved regions take a cut that varies by platform. A threshold placed
+# just under the nominal figure therefore rejects machines that meet the
+# stated requirement, so both sit well below it.
+#
+#   4 GB fitted  -> 3.3 to 3.9 GB reported
+#   8 GB fitted  -> about 7.4 GB reported
+readonly MIN_MEM_MB=3000
 readonly REC_MEM_MB=6800
 readonly MIN_DISK_GB=25
 readonly REC_DISK_GB=40
