@@ -45,12 +45,22 @@ provision_collect_default() {
     ask value "Campaign name" "$(cfg SAVE_NAME)"
     cfg_set SAVE_NAME "$value"
 
-    ask_secret value "Server password (empty for none)"
-    cfg_set SERVER_PASSWORD "$value"
+    # At install time an empty answer means "no password". When one is
+    # already set - reconfiguring, or a second pass - an empty answer means
+    # "leave it alone". Silently clearing a working server's password
+    # because somebody pressed Enter is not a defensible default.
+    if [[ -n "$(cfg SERVER_PASSWORD)" ]]; then
+        ask_secret value "Server password (Enter keeps the current one)"
+        [[ -n "$value" ]] && cfg_set SERVER_PASSWORD "$value"
+    else
+        ask_secret value "Server password (empty for none)"
+        cfg_set SERVER_PASSWORD "$value"
+    fi
     unset value
 
-    # Only asked when the default is genuinely unavailable.
-    if port_in_use "$(cfg GAME_PORT)" udp; then
+    # Only asked when the default is genuinely unavailable - which does
+    # not include this installation's own server already holding it.
+    if port_conflicts "$(cfg GAME_PORT)"; then
         local suggestion; suggestion="$(find_free_port "$(cfg GAME_PORT)" udp || echo "")"
         warn "UDP port $(cfg GAME_PORT) is already in use on this host."
         ask value "Game port" "${suggestion:-4201}"
@@ -125,14 +135,26 @@ provision_summary() {
     out_kv "Update checks"     "$( cfg_bool UPDATE_CHECK_ENABLED && cfg UPDATE_CHECK_SCHEDULE || printf 'disabled' )"
     out_kv "Automatic updates" "$( cfg_bool AUTO_UPDATE && printf 'enabled' || printf 'disabled (recommended)' )"
     out_line ""
-    out_line "  About 6 GB will be downloaded from Steam."
-    out_line ""
+    # Shared with `coop config`, where nothing is fetched. Only say it
+    # when it is going to happen.
+    if ! server_installed; then
+        out_line "  About 6 GB will be downloaded from Steam."
+        out_line ""
+    fi
 }
 
 # ---------------------------------------------------------- the engine --
 # Applies a validated configuration. Asks nothing, returns exit codes.
 provision_run() {
     local skip_download="${1:-0}"
+
+    # Skipping the download is only safe when there is something to skip
+    # it in favour of. A reconfigure that moved the installation directory
+    # or switched channel has no server files at the new location.
+    if (( skip_download )) && ! server_installed; then
+        debug "download was to be skipped, but no server files are present"
+        skip_download=0
+    fi
 
     step "Creating the directory layout"
     mkdir -p "$DIR_CONFIG" "$DIR_SAVES" "$DIR_COOPDATA" "$DIR_SERVER" \
@@ -279,6 +301,12 @@ provision_validate() {
 
 # ------------------------------------------------------- existing install --
 # A second `coop install` must never quietly overwrite a campaign.
+#
+# The answer comes back in EXISTING_CHOICE, not on stdout. The menu itself
+# is printed on stdout, so capturing this function with $( ) would swallow
+# the menu and hand the caller the menu text with the answer glued to the
+# end - which matched no case and silently exited.
+EXISTING_CHOICE=""
 provision_existing_menu() {
     out_title "An existing installation was found"
     out_kv "Directory" "$INSTALL_DIR"
@@ -293,7 +321,14 @@ provision_existing_menu() {
     out_line "  [4] Exit         change nothing"
     out_line ""
 
-    local choice
-    ask choice "Select" "4"
-    printf '%s' "$choice"
+    if (( NON_INTERACTIVE )); then
+        fail "$EX_CONFIG" \
+            "There is already an installation in $INSTALL_DIR." \
+            "Pick what you meant, rather than having a default chosen for you:" \
+            "  coop update              install a newer Coop build" \
+            "  coop config --apply      rewrite generated files and restart" \
+            "  coop install --install-dir <other path> --instance <id>"
+    fi
+
+    ask EXISTING_CHOICE "Select" "4"
 }

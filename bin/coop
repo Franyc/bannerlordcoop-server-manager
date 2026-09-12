@@ -181,6 +181,25 @@ cmd_install() {
     out_line "  Manager v${MANAGER_VERSION}"
     out_line ""
 
+    # ---- existing installation ---------------------------------------
+    # Asked before the compatibility check, not after. "Can this machine
+    # run a server" is the wrong first question to put to a machine that
+    # is already running one; what the user wants there is update, repair
+    # or reconfigure. Only reconfigure continues into the steps below.
+    if installation_present; then
+        provision_existing_menu
+        case "$EXISTING_CHOICE" in
+            1) exec "$0" ${OUTPUT_FORMAT:+--json} update ;;
+            2) log "Repairing"; provision_run 1; server_start; provision_validate; exit $? ;;
+            # Reconfiguring changes settings, not the build, so there is
+            # nothing to fetch. provision_run downloads anyway if it finds
+            # no server files - which is what happens if the directory or
+            # channel is changed along the way.
+            3) mode="advanced"; skip_download=1 ;;
+            *) log "Nothing was changed."; exit 0 ;;
+        esac
+    fi
+
     # ---- [1/8] read-only system check --------------------------------
     out_line "[1/8] System compatibility"
     local pf=0
@@ -193,16 +212,6 @@ cmd_install() {
         1) confirm "Continue despite the warnings above?" no \
                || { log "Nothing was changed."; exit 0; } ;;
     esac
-
-    # ---- existing installation ---------------------------------------
-    if installation_present; then
-        case "$(provision_existing_menu)" in
-            1) exec "$0" ${OUTPUT_FORMAT:+--json} update ;;
-            2) log "Repairing"; provision_run 1; server_start; provision_validate; exit $? ;;
-            3) mode="advanced" ;;
-            *) log "Nothing was changed."; exit 0 ;;
-        esac
-    fi
 
     # ---- [2/8] setup mode --------------------------------------------
     if [[ -z "$mode" ]]; then
@@ -285,14 +294,20 @@ cmd_install() {
     # ---- [8/8] start and validation --------------------------------------
     out_line ""
     out_line "[8/8] Starting the server"
-    if (( skip_download )); then
-        warn "Skipped the download, so there is nothing to start."
+    if ! server_installed; then
+        warn "No server files are installed, so there is nothing to start."
+    elif container_running; then
+        # Reconfiguring reaches this point with the old container still
+        # up. Settings such as the port or the password only take effect
+        # on a restart, and reporting "installation complete" over a
+        # server still running the previous configuration would be a lie.
+        log "Restarting so the new configuration takes effect"
+        server_stop
+        server_start || warn "The server did not reach 'serving'. See: coop logs"
     else
         server_start || warn "The server did not reach 'serving'. See: coop logs"
     fi
 
-    out_line ""
-    out_line "Validation"
     provision_validate || true
 
     out_line "Installation complete."

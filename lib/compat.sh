@@ -199,6 +199,16 @@ port_in_use() {
     fi
 }
 
+# True when something OTHER than this installation's own server holds the
+# port. A running server occupying its own port is not a conflict - it is
+# the thing being reconfigured.
+port_conflicts() {
+    local port="$1"
+    port_in_use "$port" udp || return 1
+    installation_present && container_running && [[ "$port" == "$(cfg GAME_PORT)" ]] && return 1
+    return 0
+}
+
 # Finds the next free port at or after the given one, so automatic port
 # selection has something to select.
 find_free_port() {
@@ -320,8 +330,15 @@ compat_preflight() {
     fi
 
     # -- ports -------------------------------------------------------------
-    if port_in_use "$port" udp; then
-        _check fail "Game port" "UDP $port is already in use"; worst=2
+    # A server already running here holds its own port, which is not a
+    # conflict - it is the thing being reconfigured. Without this, running
+    # the installer on a working host reported "this system cannot run a
+    # Bannerlord Coop server" about the Bannerlord Coop server it is
+    # currently running.
+    if port_conflicts "$port"; then
+        _check fail "Game port" "UDP $port is already in use by something else"; worst=2
+    elif port_in_use "$port" udp; then
+        _check ok "Game port" "UDP $port is held by this server"
     else
         _check ok "Game port" "UDP $port is free"
     fi

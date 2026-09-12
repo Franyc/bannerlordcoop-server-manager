@@ -236,7 +236,9 @@ Players connect with **Direct Connect** to `<your-server-ip>:4200`.
 ## Installing again
 
 Running `coop install` on an existing installation never overwrites
-anything silently:
+anything silently. The question comes **before** the compatibility check,
+because "can this machine run a server" is the wrong first thing to ask a
+machine that is already running one:
 
 ```
 An existing installation was found
@@ -252,6 +254,13 @@ An existing installation was found
   [3] Reconfigure  change settings, then apply them
   [4] Exit         change nothing
 ```
+
+Reconfigure walks through the advanced questions with your current values
+as the defaults, then applies them and restarts - settings such as the
+port or the password only take effect on a restart. It does not
+re-download the server; `coop update` is the command for changing the
+build. An empty answer at the password prompt keeps the existing password
+rather than clearing it.
 
 ## Several servers on one host
 
