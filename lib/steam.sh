@@ -95,6 +95,30 @@ steam_status_explain() {
 }
 
 # ------------------------------------------------------------------- login --
+# Everything `coop steam login` needs in order to run on a host where
+# nothing has been installed yet.
+#
+# This command has to be the one that can go first: Steam Guard cannot be
+# answered without a terminal, so the documented way to provision a server
+# unattended is to authenticate once by hand and let the install reuse the
+# session. A login that required an existing installation would make that
+# order impossible - which is exactly what it did.
+#
+# SteamCMD itself runs in a container, so Docker is a genuine prerequisite
+# rather than a convenience. Installing it here is announced, not silent.
+steam_prepare() {
+    mkdir -p "$DIR_STEAM" "$DIR_WORKSHOP" "$DIR_CONFIG" "$DIR_STATE" \
+        || fail "$EX_RUNTIME" "Cannot create $INSTALL_DIR"
+    chmod 0750 "$INSTALL_DIR" 2>/dev/null || true
+
+    if ! docker info >/dev/null 2>&1; then
+        log "SteamCMD runs in a container, so Docker has to be available first."
+        compat_detect
+        deps_install_base
+        deps_install_docker
+    fi
+}
+
 steam_login() {
     docker_require
     local user="${1:-$(cfg STEAM_USERNAME)}"

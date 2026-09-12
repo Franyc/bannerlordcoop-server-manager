@@ -447,7 +447,10 @@ cmd_backup() {
 cmd_steam() {
     local sub="${1:-status}"
     [[ $# -gt 0 ]] && shift
-    require_installation
+
+    # Deliberately not gated on an existing installation. Authenticating
+    # once and then provisioning unattended is the documented order, so
+    # this is the command that has to be able to run first.
     case "$sub" in
         status)
             local probe="" st
@@ -464,8 +467,9 @@ cmd_steam() {
                 out_line ""
             fi
             [[ "$st" == "valid" || "$st" == "present" ]] || return "$EX_STEAM" ;;
-        login)  require_root; steam_login "$@"; config_persist "$FILE_CONFIG" STEAM_USERNAME ;;
-        logout) require_root; steam_logout ;;
+        login)  require_root; steam_prepare; steam_login "$@"
+                config_persist "$FILE_CONFIG" STEAM_USERNAME ;;
+        logout) require_installation; require_root; steam_logout ;;
         *) fail "$EX_USAGE" "Unknown steam subcommand: $sub" ;;
     esac
 }

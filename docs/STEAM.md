@@ -49,6 +49,12 @@ worked around. That has one practical consequence:
 reused and nothing prompts, which is what lets updates and unattended
 installs run on their own.
 
+That is also why `coop steam login` works on a host where nothing has been
+installed yet: it is the command that has to be able to go first. On a bare
+machine it creates the installation directory and, if Docker is missing,
+installs it - SteamCMD runs in a container, so that is a real prerequisite
+rather than a convenience. It says so before doing it.
+
 ## Checking the session
 
 ```bash
