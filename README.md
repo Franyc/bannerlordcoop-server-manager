@@ -89,8 +89,14 @@ Players connect with **Direct Connect** to `<your-server-ip>:4200`.
 
 ### Default setup
 
-The recommended path. Two questions and a Steam login; everything else uses
-values chosen from a server that has been running in production.
+The recommended path. Two questions and a Steam login; everything else
+comes from `config/defaults.env` - the game's own value wherever the server
+has one, and conservative choices for backups and updates.
+
+Gameplay settings are not among them. Difficulty, battle size and the rest
+live in `mod-config.json`, which the Coop mod creates with its own defaults
+the first time the server starts. This installer neither ships nor
+overwrites that file; it only carries your changes across an update.
 
 ```
 [3/8] Campaign
@@ -316,11 +322,21 @@ Installed Coop build:       build 2026-09-06 / Mount & Blade II: Bannerlord v1.4
 
 ## Status
 
-**v0.1.0 - early.** The design is derived from a server that has been
-running in production, and the risky paths - clean shutdown, save-and-wait,
-backup, restore, rollback - are ported from there rather than reinvented.
-The update path itself has not yet been exercised against a real Workshop
-release. Watch the output the first time you run `coop update`.
+**v0.1.0 - early, but not untested.** Installed and exercised end to end on
+Ubuntu 26.04 and Debian 13:
+
+- install from nothing: dependency and Docker setup, Workshop download,
+  world creation, first start
+- clean shutdown through the server console, with the closing save
+- backup, listing, and restore of a deliberately destroyed campaign, with
+  its pre-restore safety copy
+- update, and an automatic rollback from a build that would not start
+- save import, scheduled backups, and the diagnostics
+
+One thing has not been tested, and cannot be until it happens: an update to
+a genuinely **newer** Coop build. The machinery has run - version check,
+download, rollback copy, automatic rollback - but so far only against the
+same build. Watch the output the first time you run `coop update`.
 
 ## Licence
 

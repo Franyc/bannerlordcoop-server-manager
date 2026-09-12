@@ -1,9 +1,9 @@
 # Architecture
 
 How this works, and why it works that way. Every measurement below was
-taken on a running server rather than read from documentation - the point
-of writing them down is that anyone later tempted to "simplify" something
-knows what it was protecting against.
+taken on a running server - Ubuntu 26.04 and Debian 13 - rather than read
+from documentation. The point of writing them down is that anyone later
+tempted to "simplify" something knows what it was protecting against.
 
 ## The layers
 

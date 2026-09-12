@@ -141,8 +141,12 @@ Server password (empty for none): ********
 The game port is only asked about if UDP 4200 is already taken, in which
 case the next free port is offered.
 
-Everything else uses defaults taken from a server that has been running in
-production - see [CONFIGURATION.md](CONFIGURATION.md).
+Everything else comes from `config/defaults.env`, documented setting by
+setting in [CONFIGURATION.md](CONFIGURATION.md).
+
+Gameplay settings are not part of that. Difficulty, battle size and the
+rest belong to `mod-config.json`, which the Coop mod writes with its own
+defaults on first start.
 
 > **There is no "server name" and no "maximum players" question**, because
 > the dedicated server has neither setting. `server-config.json` has nine
