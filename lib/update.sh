@@ -262,29 +262,142 @@ update_apply() {
     out_line ""
 }
 
-# mod-config.json holds the gameplay settings and belongs to the mod, not
-# to the manager - but a new build may overwrite it. If it changed, the
-# player's version is put back and the new one is left alongside for
-# comparison rather than silently discarded.
+# modconfig_merge <previous> <new> <output> <report>
+#
+# WHY A MERGE AND NOT A RESTORE
+# -----------------------------
+# mod-config.json holds the gameplay settings - difficulty, world ageing,
+# battle size - and belongs to the Coop mod, which rewrites it with that
+# build's defaults. Neither simple answer is right:
+#
+#   keep the new file   -> every setting the player chose is silently reset
+#   put the old file back -> settings the new build introduced are missing,
+#                            and the mod re-adds them on the next boot, so
+#                            the same fight happens again every launch
+#
+# So the NEW file is the template. It brings the new keys and the comments
+# that document them. Every value that existed before is transplanted into
+# it; keys that are new keep their default; keys that no longer exist are
+# dropped, because the setting is gone.
+#
+# The file is JSONC, which jq cannot read - but it is strictly one setting
+# per line, which makes a line-oriented merge both possible and safe, and
+# leaves every comment untouched.
+#
+# The report file receives one "added <key>" or "removed <key>" line per
+# difference, so the caller can tell the user what actually changed.
+modconfig_merge() {
+    local previous="$1" new="$2" output="$3" report="$4"
+
+    awk '
+    function keyof(line,   p, q) {
+        p = index(line, "\"")
+        if (p == 0) return ""
+        q = index(substr(line, p + 1), "\"")
+        if (q == 0) return ""
+        return substr(line, p + 1, q - 1)
+    }
+    function valof(line,   v) {
+        v = substr(line, index(line, ":") + 1)
+        sub(/^[[:space:]]+/, "", v)
+        sub(/[[:space:]]+$/, "", v)
+        return v
+    }
+    function indentof(line) {
+        match(line, /^[[:space:]]*/)
+        return substr(line, 1, RLENGTH)
+    }
+
+    # First pass: remember what the player had.
+    NR == FNR {
+        if ($0 ~ /^[[:space:]]*"[A-Za-z0-9_]+"[[:space:]]*:/) {
+            k = keyof($0); v = valof($0); sub(/,$/, "", v)
+            # A block opener carries no value of its own.
+            if (v != "{" && v != "") kept[k] = v
+        }
+        next
+    }
+
+    # Second pass: the new file, with old values written back in.
+    {
+        if ($0 ~ /^[[:space:]]*"[A-Za-z0-9_]+"[[:space:]]*:/) {
+            k = keyof($0); v = valof($0)
+            comma = (v ~ /,$/) ? "," : ""
+            sub(/,$/, "", v)
+            if (v != "{") {
+                if (k in kept) {
+                    seen[k] = 1
+                    print indentof($0) "\"" k "\": " kept[k] comma
+                    next
+                }
+                print "added " k > REPORT
+            }
+        }
+        print
+    }
+
+    END {
+        for (k in kept) if (!(k in seen)) print "removed " k > REPORT
+    }
+    ' REPORT="$report" "$previous" "$new" >"$output"
+}
+
+# Called after the server has booted on the new build, because that is when
+# the mod rewrites its configuration.
 _update_guard_mod_config() {
-    local before="$1" after
+    local before="$1" after saved="$DIR_ROLLBACK/mod-config.json.bak"
     after="$(md5sum "$FILE_MOD_JSON" 2>/dev/null | cut -d' ' -f1 || true)"
 
     if [[ -z "$before" || "$before" == "$after" ]]; then
         debug "gameplay configuration unchanged"
         return 0
     fi
+    if [[ ! -f "$saved" ]]; then
+        warn "The gameplay configuration changed, but there is no previous copy to merge from."
+        return 0
+    fi
 
-    warn "The update rewrote mod-config.json; restoring your version."
+    log "The new build rewrote the gameplay configuration; merging your settings back in"
     cp -a "$FILE_MOD_JSON" "${FILE_MOD_JSON}.new-from-update"
-    cp -a "$DIR_ROLLBACK/mod-config.json.bak" "$FILE_MOD_JSON"
-    chown "$(cfg PUID):$(cfg PGID)" "$FILE_MOD_JSON" 2>/dev/null || true
 
-    out_line "    The new version is kept beside it. Compare them when convenient:"
+    local merged report
+    merged="${FILE_MOD_JSON}.merged.$$"
+    report="${FILE_MOD_JSON}.report.$$"
+    cleanup_register "$merged"; cleanup_register "$report"
+
+    modconfig_merge "$saved" "$FILE_MOD_JSON" "$merged" "$report"
+
+    # A merge that lost settings is worse than no merge at all, so the
+    # result has to account for every line the new file had.
+    local new_count merged_count
+    new_count="$(grep -cE '^[[:space:]]*"[A-Za-z0-9_]+"[[:space:]]*:' "$FILE_MOD_JSON" || echo 0)"
+    merged_count="$(grep -cE '^[[:space:]]*"[A-Za-z0-9_]+"[[:space:]]*:' "$merged" || echo 0)"
+    if (( merged_count != new_count )) || (( merged_count == 0 )); then
+        warn "The gameplay configuration could not be merged safely; the new build's defaults are in place."
+        out_line "    Your previous settings: ${saved}"
+        out_line "    Compare them with: diff ${saved} ${FILE_MOD_JSON}"
+        return 0
+    fi
+
+    cp -a "$merged" "$FILE_MOD_JSON"
+    chown "$(cfg PUID):$(cfg PGID)" "$FILE_MOD_JSON" 2>/dev/null || true
+    ok "Gameplay settings carried over"
+
+    local line
+    while IFS=' ' read -r what key; do
+        [[ -n "${key:-}" ]] || continue
+        case "$what" in
+            added)   out_line "    new setting, left at the new default: $key" ;;
+            removed) out_line "    setting no longer exists in this build: $key" ;;
+        esac
+    done <"$report"
+
+    out_line "    The build's own version is kept beside it:"
     out_line "      diff ${FILE_MOD_JSON} ${FILE_MOD_JSON}.new-from-update"
 
+    # The merged values only take effect on the next boot.
     server_stop
     server_start || fail "$EX_HEALTH" \
-        "Restart after restoring the gameplay configuration failed." \
+        "Restart after merging the gameplay configuration failed." \
         "Logs: coop logs"
 }

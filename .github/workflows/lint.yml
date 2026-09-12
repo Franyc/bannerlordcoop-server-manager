@@ -105,6 +105,38 @@ jobs:
             echo "round trip is stable"
           '
 
+      # Whether a player's difficulty settings survive a new Coop build
+      # comes down to this one function. The fixtures in tests/modconfig
+      # describe the expected outcome.
+      - name: Gameplay configuration merge
+        run: |
+          COOP_ROOT="$PWD" bash -c '
+            set -euo pipefail
+            COOP_ROOT="$PWD"
+            for m in common output config state docker server steam compat backup update; do
+              . "lib/$m.sh"
+            done
+            out=/tmp/merged.json; rep=/tmp/report.txt
+            modconfig_merge tests/modconfig/previous.json tests/modconfig/new.json "$out" "$rep"
+
+            fail() { echo "FAIL: $1"; echo "--- merged ---"; cat "$out"; echo "--- report ---"; cat "$rep"; exit 1; }
+
+            grep -q "\"playerReceivedDamage\": \"Realistic\"" "$out" || fail "a changed value was not carried over"
+            grep -q "\"battleSize\": 500"                     "$out" || fail "a changed value was not carried over"
+            grep -q "\"enableHeroExecutions\": false"          "$out" || fail "a changed value was not carried over"
+            grep -q "\"addedInNewBuild\": \"Balanced\""        "$out" || fail "a setting new in this build was lost"
+            if grep -q "goneInNewBuild" "$out"; then fail "a setting the build dropped came back"; fi
+            grep -qx "added addedInNewBuild"   "$rep" || fail "the new setting was not reported"
+            grep -qx "removed goneInNewBuild"  "$rep" || fail "the dropped setting was not reported"
+            grep -q "NEW IN THIS BUILD"        "$out" || fail "comments from the new file were lost"
+
+            new_n=$(grep -cE "^[[:space:]]*\"[A-Za-z0-9_]+\"[[:space:]]*:" tests/modconfig/new.json)
+            got_n=$(grep -cE "^[[:space:]]*\"[A-Za-z0-9_]+\"[[:space:]]*:" "$out")
+            [ "$new_n" = "$got_n" ] || fail "setting count changed: $new_n -> $got_n"
+
+            echo "values carried over, new keys adopted, dropped keys gone, comments intact"
+          '
+
   docs:
     name: Documentation
     runs-on: ubuntu-latest

@@ -1,0 +1,13 @@
+{
+  // What the player had. Comments here come from the older build.
+  "difficulty": {
+    // Changed by the player from the shipped default.
+    "playerReceivedDamage": "Realistic",
+    // This setting no longer exists in the newer build.
+    "goneInNewBuild": true,
+  },
+  "modOptions": {
+    "battleSize": 500,
+    "enableHeroExecutions": false,
+  },
+}

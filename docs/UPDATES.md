@@ -126,16 +126,57 @@ same pre-update backup and automatic rollback as a manual run.
 
 ## Gameplay configuration during an update
 
-`mod-config.json` belongs to the Coop mod, not to this manager, and a new
-build may rewrite it. The manager takes a checksum before and after. If it
-changed:
+`mod-config.json` holds the gameplay settings - difficulty, world ageing,
+battle size - and belongs to the Coop mod, not to this manager. A new build
+rewrites it with that build's defaults on first boot.
 
-- your version is put back
-- the new one is kept beside it as `mod-config.json.new-from-update`
-- the server is restarted
-- you are told, with the `diff` command to compare them
+Neither obvious answer is right:
 
-Nothing is discarded silently in either direction.
+| | |
+|---|---|
+| Keep the new file | Every setting you chose is silently reset |
+| Put your old file back | Settings the new build introduced are missing, and the mod re-adds them on the next boot - so the same fight happens every launch |
+
+So the manager **merges**. The new file is the template: it brings the new
+keys and the comments that document them. Every value you had set is
+transplanted into it.
+
+| Setting | What happens |
+|---|---|
+| In both files | Your value is kept |
+| New in this build | Left at the build's default, and reported by name |
+| Gone from this build | Dropped, and reported by name |
+
+```
+The new build rewrote the gameplay configuration; merging your settings back in
+  + Gameplay settings carried over
+    new setting, left at the new default: newSetting
+    setting no longer exists in this build: wandererLimitScalesWithPlayers
+    The build's own version is kept beside it:
+      diff .../mod-config.json .../mod-config.json.new-from-update
+```
+
+The server is restarted afterwards, because the merged values only take
+effect on the next boot.
+
+Two safeguards. The build's own version is always kept beside yours as
+`mod-config.json.new-from-update`, so nothing is lost either way. And if
+the merged file does not account for every setting the new file had, it is
+discarded and the build's defaults are left in place with a pointer to your
+previous copy - a merge that quietly loses settings would be worse than no
+merge at all.
+
+### How the merge works
+
+The file is JSONC, so `jq` cannot read it. It is also strictly one setting
+per line, which makes a line-oriented merge both possible and safe: values
+are substituted in place and every comment survives untouched. All setting
+names in the file are unique, so a value is matched by name regardless of
+which section it lives in.
+
+A rollback is different: `coop rollback` puts the whole previous
+`mod-config.json` back, because the older build expects exactly the keys it
+shipped with.
 
 ## After updating
 
