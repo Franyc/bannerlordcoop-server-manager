@@ -234,6 +234,32 @@ find_free_port() {
     return 1
 }
 
+# ----------------------------------------------------------------- firewall --
+# WHY THIS REPORTS AND DOES NOT CONFIGURE
+#
+# Docker inserts its own chains ahead of ufw's in FORWARD, so a published
+# container port is reachable from the internet whether or not ufw allows
+# it. `ufw allow <game port>` would therefore be a placebo: a rule that
+# reads as protection and provides none, on a host whose owner then stops
+# looking. The firewall that does govern this port is the one in front of
+# the machine - a provider's, or a rule in the DOCKER-USER chain - and
+# neither is something an application installer should write on its own.
+#
+# So the manager finds out what is there and says so plainly.
+#
+# Returns: absent | inactive | active | unknown
+firewall_state() {
+    command -v ufw >/dev/null 2>&1 || { printf 'absent'; return 0; }
+    local out
+    out="$(ufw status 2>/dev/null)" || { printf 'unknown'; return 0; }
+    # English is guaranteed: bin/coop pins the locale.
+    if grep -qi '^Status:[[:space:]]*active' <<<"$out"; then
+        printf 'active'
+    else
+        printf 'inactive'
+    fi
+}
+
 # ---------------------------------------------------------------- network --
 # The question is "can this host be reached", not "does that URL exist".
 # curl -f treats any non-2xx as failure, and api.steampowered.com answers

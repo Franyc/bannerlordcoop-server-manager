@@ -222,14 +222,16 @@ exits 70 rather than waiting.
 | Memory | 0.9-1.6 GB - about 890 MB on a fresh world, 1.2-1.6 GB on a grown campaign |
 | CPU | about 1.2 cores, with or without players - 120-122% on Ubuntu 26.04, 121% on Debian 13 |
 | Bandwidth | about 58 KB/s per player |
-| Campaign load time | about 2 minutes for a grown save |
+| Campaign load time | about 50 seconds for a fresh world, about 2 minutes for a grown save |
 | Workshop item | about 6.1 GB |
-| Backup archive | about 33 MB |
+| Backup archive | 12-25 MB, depending on how grown the campaign is |
 | Clean shutdown | 2 seconds |
 
 With no players connected the campaign pauses on its own, so the server can
-be left running around the clock - and an hourly backup of an idle server
-costs one checksum.
+be left running around the clock. An hourly backup of an idle server is
+skipped, but the test for "idle" has to be the campaign date rather than
+the save file: the server autosaves every few minutes regardless, so the
+file changes even while the world stands still.
 
 **The process does not idle down, though.** Measured over five samples on a
 four-core machine with nobody connected and the campaign paused: 120-122%

@@ -182,7 +182,6 @@ cmd_install() {
         case "$arg" in
             --default)  mode="default" ;;
             --advanced) mode="advanced" ;;
-            --no-download) skip_download=1 ;;   # for testing the plumbing
             *) fail "$EX_USAGE" "Unknown option for install: $arg" ;;
         esac
     done
@@ -326,9 +325,21 @@ cmd_install() {
     out_kv "Connect to" "UDP $(cfg GAME_PORT) on this host's public address"
     out_kv "Next"       "coop status"
     out_line ""
-    out_line "  Open UDP $(cfg GAME_PORT) at your hosting provider as well - Docker"
-    out_line "  publishes ports past a host firewall such as ufw."
+    _install_firewall_note
     out_line ""
+}
+
+# Says what is actually true on this host, rather than a generic reminder.
+_install_firewall_note() {
+    out_line "  Open UDP $(cfg GAME_PORT) at your hosting provider. That firewall is the"
+    out_line "  one that governs this port."
+    if [[ "$(firewall_state)" == "active" ]]; then
+        out_line ""
+        out_line "  ufw is active on this host, and it does NOT cover the game port:"
+        out_line "  Docker publishes container ports ahead of ufw's rules. Allowing or"
+        out_line "  denying UDP $(cfg GAME_PORT) in ufw would change nothing, which is why"
+        out_line "  this installer does not write such a rule."
+    fi
 }
 
 _install_cli_symlink() {

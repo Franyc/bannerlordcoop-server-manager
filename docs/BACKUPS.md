@@ -55,17 +55,30 @@ The timer uses `Persistent=true`, so a run missed while the machine was off
 is caught up, and a randomised delay of up to five minutes, so it does not
 collide with the server's own autosave.
 
-### Why hourly is cheap
+### Why hourly is not expensive
 
-With nobody connected, the campaign pauses on its own and the save file is
-byte-identical from one hour to the next. The automatic run checks both
-conditions - no players, unchanged save - and skips entirely:
+An automatic run is skipped when **the campaign has not advanced and nobody
+is connected**:
 
 ```
 Automatic backup skipped: the campaign is unchanged and nobody is connected.
 ```
 
-So an idle server costs one checksum per hour rather than 33 MB.
+The campaign date is the signal, not the save file. That is not an obvious
+choice, so it is worth saying why it is the right one.
+
+The first version compared a checksum of the `.sav`, and it almost never
+matched: the server autosaves every few minutes whether or not the world is
+moving, so the file changes while the campaign stands still. Measured over
+one night on a completely idle server - 23 timer runs, 21 full backups,
+480 MB of byte-different copies of a world that had not advanced by a
+single day.
+
+The campaign date does not have that problem. It only moves while players
+are connected, because the campaign pauses without them, and Bannerlord
+time runs fast enough that any real session changes it. When the server is
+stopped there is no campaign date to read, and the checksum is used
+instead - there the file genuinely does sit still.
 
 ## Backup types
 
@@ -92,8 +105,10 @@ Manual and pre-restore backups are only ever removed by their own count
 limit. An aggressive size cap must not be able to delete the safety copy
 you took deliberately before a restore.
 
-At roughly 33 MB per archive, the defaults keep two days of hourly history
-plus everything you asked for by hand.
+An archive runs 12-25 MB depending on how grown the campaign is, so the
+defaults hold a couple of days of history plus everything you asked for by
+hand - and on an idle server the hourly run is skipped, so those two days
+stretch as far as the server sits unused.
 
 ## Listing
 
@@ -102,10 +117,11 @@ $ coop backup list
 
 Backups
 
-#  ID               CREATED           TYPE        SIZE   NOTE
-1  20260911-004626  2026-09-11 00:46  auto        33 MB
-2  20260910-180000  2026-09-10 18:00  pre-update  32 MB  before Workshop update
-3  20260910-124100  2026-09-10 12:41  manual      31 MB  before the siege
+#  ID               CREATED           TYPE         SIZE   NOTE
+1  20260912-223231  2026-09-12 22:32  auto         24 MB
+2  20260912-020250  2026-09-12 02:02  pre-update   24 MB  before Workshop update
+3  20260912-015739  2026-09-12 01:57  manual       12 MB  before save import
+4  20260912-015614  2026-09-12 01:56  pre-restore   9 MB  before restoring pre-update-20260912-015109.tar.gz
 
   Restore with: coop backup restore <ID>
 ```
@@ -203,8 +219,8 @@ $ sudo coop backup restore
 Backups
 
 #  ID               CREATED           TYPE        SIZE   NOTE
-1  20260911-004626  2026-09-11 00:46  auto        33 MB
-2  20260910-180000  2026-09-10 18:00  pre-update  32 MB  before Workshop update
+1  20260912-223231  2026-09-12 22:32  auto        24 MB
+2  20260912-020250  2026-09-12 02:02  pre-update  24 MB  before Workshop update
 
 Select a backup by number or ID: 2
 ```

@@ -95,14 +95,19 @@ coop status
 ```
 
 ```
-Status            ONLINE
-Campaign          My Campaign  (Spring 2, 1095)
-Connection        UDP 4200  (password set)
+  Status             ONLINE
+  Uptime             1m 8s
+  Campaign           My Campaign  (Summer 11, 1084)
+  Players            0  (1161 parties)
+  Connection         UDP 4200  (password set)
+  Install channel    Steam Workshop
+  Coop build         build 2026-09-06 / Mount & Blade II: Bannerlord v1.4.8
 ```
 
-The campaign date is the proof. If it shows `Summer 1, 1084`, the server
-created a new world instead of loading yours - check that `SAVE_NAME`
-matches a file in `saves/`.
+The campaign date is the proof. `Summer 1, 1084` is the date of a freshly
+created world: if you see exactly that, the server started a new game
+instead of loading yours. Check that `SAVE_NAME` matches a file in
+`saves/`.
 
 ```bash
 coop doctor

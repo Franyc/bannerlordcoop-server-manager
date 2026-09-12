@@ -382,7 +382,15 @@ _doctor_server() {
     else
         _hc warn "Server" "Game port" "UDP $(cfg GAME_PORT) is not bound - the server is stopped"
     fi
-    _hc info "Server" "Firewall reminder" "UDP $(cfg GAME_PORT) must be open at your provider too"
+    case "$(firewall_state)" in
+        active)
+            _hc warn "Server" "Host firewall" "ufw is active, but it does not govern the published game port - Docker publishes past it"
+            ;;
+        inactive) _hc info "Server" "Host firewall" "ufw is installed but inactive" ;;
+        absent)   _hc info "Server" "Host firewall" "no ufw on this host" ;;
+        *)        _hc info "Server" "Host firewall" "could not be determined" ;;
+    esac
+    _hc info "Server" "Reachability" "UDP $(cfg GAME_PORT) has to be open at your provider - that firewall is the one that counts"
 
     if container_exists; then
         local errors

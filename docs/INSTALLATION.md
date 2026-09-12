@@ -64,18 +64,23 @@ reachability of Steam, Docker and WineHQ.
 ```
 System compatibility
 
-  + Operating system   Ubuntu 24.04.1 LTS
+  + Operating system   Debian GNU/Linux 13 (trixie)
   + Architecture       x86_64
-    Kernel             6.8.0-41-generic
+    Kernel             6.12.107+deb13-amd64
   + Privileges         running as root
   + Package manager    apt
   > Required tools     will be installed: jq rsync
   > Docker Engine      not installed - will be installed from Docker's own repository
-  + Memory             7940 MB
-  + Disk space         184 GB free at /srv
+  > Docker Compose     compose plugin missing - will be installed
+  + Memory             7946 MB
+  + Disk space         67 GB free at /srv/bannerlordcoop
+  + CPU cores          4
   + Game port          UDP 4200 is free
   + Internet access    Steam, Docker and WineHQ reachable
 ```
+
+A `>` marks something the installer is about to do on purpose. Only `!`
+and `x` are warnings and failures.
 
 Checking real package availability matters on older systems: a release can
 still be installable while no longer carrying the packages it needs. On
@@ -222,7 +227,11 @@ just that the container is up.
 ## Validating
 
 ```
-[8/8] Validation
+[8/8] Starting the server
+Starting the server
+  + Server is serving ('My Campaign')
+
+Validation
 
   + Container running
   + Server process serving clients
@@ -250,10 +259,10 @@ machine that is already running one:
 ```
 An existing installation was found
 
-  Directory   /srv/bannerlordcoop
-  Campaign    My Campaign
-  Installed   2026-09-11T00:46:26+02:00
-  Build       build 2026-09-06 / Mount & Blade II: Bannerlord v1.4.8
+  Directory          /srv/bannerlordcoop
+  Campaign           ImportedRun
+  Installed          2026-09-12T01:36:51Z
+  Build              build 2026-09-06 / Mount & Blade II: Bannerlord v1.4.8
 
   [1] Update       install a newer Coop build
   [2] Repair       rebuild the image and rewrite generated files,

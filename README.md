@@ -25,7 +25,8 @@ coop status
 - **Shuts down properly.** Stopping sends `stop` to the server console and
   waits for the closing save, rather than killing the process mid-write.
 - **Backs up on a schedule.** Saves, server settings and gameplay settings
-  as one archive - and skips the run entirely when nothing has changed.
+  as one archive - and skips the run when the campaign has not advanced and
+  nobody is connected.
 - **Updates with a way back.** Pre-update backup, a kept copy of the
   previous build, and an automatic rollback if the new one will not start.
 - **Restores as a transaction.** A restore is validated, staged, and swapped
@@ -245,9 +246,8 @@ Details: [docs/UPDATES.md](docs/UPDATES.md).
 
 ## Backups
 
-Automatic, hourly, and free when nothing happened - with no players
-connected the campaign is paused and the save is unchanged, so the run is
-skipped.
+Automatic, hourly, and skipped when the campaign has not advanced and
+nobody is connected - the world only moves while players are on it.
 
 ```bash
 coop backup --note "before the siege"
