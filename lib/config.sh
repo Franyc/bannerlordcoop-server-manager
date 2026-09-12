@@ -269,12 +269,22 @@ config_load() {
         CFG["$arg"]="${CFG_OVERRIDE[$arg]}"
     done
 
-    # Derived globals used across the libraries.
+    config_derive_paths
+}
+
+# Recomputes everything that follows from INSTALL_DIR and INSTANCE_ID.
+#
+# Separate from config_load on purpose. After the interactive collector has
+# run, the paths may need recomputing because the advanced questions can
+# change the installation directory or the instance id, but the values in
+# CFG must NOT be re-read: calling config_load there reloads defaults.env
+# over the top and silently discards every answer the user just gave.
+config_derive_paths() {
     INSTALL_DIR="${CFG[INSTALL_DIR]}"
     INSTANCE_ID="${CFG[INSTANCE_ID]}"
 
-    # Directory layout - derived, never configured separately, so there is
-    # only ever one answer to "where does this live".
+    # Directory layout, derived and never configured separately, so there
+    # is only ever one answer to "where does this live".
     DIR_CONFIG="$INSTALL_DIR/config"
     DIR_SAVES="$INSTALL_DIR/saves"
     DIR_COOPDATA="$INSTALL_DIR/coopdata"

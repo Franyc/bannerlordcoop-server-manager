@@ -105,6 +105,30 @@ jobs:
             echo "round trip is stable"
           '
 
+      # The interactive installer collects answers into CFG and then has to
+      # recompute the derived paths, because the advanced questions can
+      # move the installation directory. Doing that with config_load reads
+      # defaults.env back over the answers, and the installer silently
+      # ignores everything the user typed.
+      - name: Collected answers survive path derivation
+        run: |
+          COOP_ROOT="$PWD" bash -c '
+            set -euo pipefail
+            COOP_ROOT="$PWD"
+            for m in common output config state docker server steam compat backup update; do
+              . "lib/$m.sh"
+            done
+            config_load
+            cfg_set SAVE_NAME "typed by the user"
+            cfg_set SERVER_PASSWORD "s3cret"
+            cfg_set INSTALL_DIR "/srv/elsewhere"
+            config_derive_paths
+            [ "$(cfg SAVE_NAME)" = "typed by the user" ] || { echo "FAIL: the campaign name was discarded"; exit 1; }
+            [ "$(cfg SERVER_PASSWORD)" = "s3cret" ]       || { echo "FAIL: the password was discarded"; exit 1; }
+            [ "$DIR_SAVES" = "/srv/elsewhere/saves" ]     || { echo "FAIL: paths were not recomputed"; exit 1; }
+            echo "answers survive, paths follow the new directory"
+          '
+
       # Whether a player's difficulty settings survive a new Coop build
       # comes down to this one function. The fixtures in tests/modconfig
       # describe the expected outcome.

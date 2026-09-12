@@ -250,8 +250,11 @@ cmd_install() {
             advanced) provision_collect_advanced ;;
             *)        provision_collect_default ;;
         esac
-        # INSTANCE_ID or INSTALL_DIR may have changed; recompute the paths.
-        config_load ${CONFIG_FILE:+--config "$CONFIG_FILE"}
+        # The advanced questions can change the installation directory or
+        # the instance id, so the derived paths are recomputed. Only the
+        # paths: reloading the configuration here would read defaults.env
+        # back over the answers that were just given.
+        config_derive_paths
     fi
     config_validate_all
 
