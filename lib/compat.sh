@@ -268,8 +268,8 @@ compat_preflight() {
             compat_package_available "$pkg" || unavailable+=("$pkg")
         done
         if (( ${#unavailable[@]} == 0 )); then
-            _check warn "Required tools" "will be installed: ${missing[*]}"
-            (( worst < 1 )) && worst=1
+            # Installable, and installing it is what this program is for.
+            _check todo "Required tools" "will be installed: ${missing[*]}"
         else
             _check fail "Required tools" "not available from your package repositories: ${unavailable[*]}"
             worst=2
@@ -286,16 +286,14 @@ compat_preflight() {
             _check fail "Docker Engine" "installed ($dver) but the daemon is not reachable"; worst=2
         fi
     else
-        _check warn "Docker Engine" "not installed - will be installed from Docker's own repository"
-        (( worst < 1 )) && worst=1
+        _check todo "Docker Engine" "not installed - will be installed from Docker's own repository"
     fi
 
     cver="$(compat_compose_version)"
     if [[ -n "$cver" ]]; then
         _check ok "Docker Compose" "$cver"
     else
-        _check warn "Docker Compose" "compose plugin missing - will be installed"
-        (( worst < 1 )) && worst=1
+        _check todo "Docker Compose" "compose plugin missing - will be installed"
     fi
 
     # -- resources ---------------------------------------------------------

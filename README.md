@@ -116,7 +116,7 @@ Both modes feed the same engine, so automation uses the same code path a
 person does:
 
 ```bash
-sudo coop install --default --non-interactive \
+sudo coop install --default --non-interactive --yes \
      --save-name "Customer Campaign" \
      --server-password "s3cret" \
      --game-port 4210

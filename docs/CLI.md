@@ -47,7 +47,7 @@ sudo coop install --advanced
 ```
 
 ```bash
-sudo coop install --default --non-interactive --save-name "Customer Campaign" --server-password "s3cret" --game-port 4210
+sudo coop install --default --non-interactive --yes --save-name "Customer Campaign" --server-password "s3cret" --game-port 4210
 ```
 
 ## Running the server

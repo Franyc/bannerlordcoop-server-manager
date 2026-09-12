@@ -18,7 +18,7 @@ state_init() {
         --arg channel "$(cfg INSTALL_CHANNEL)" \
         --arg dir "$INSTALL_DIR" \
         --arg instance "$INSTANCE_ID" \
-        --arg now "$(date -Is)" \
+        --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
         '{
             manager_version: $manager,
             install_channel: $channel,

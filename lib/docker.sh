@@ -23,6 +23,16 @@ container_health()   { docker inspect -f '{{if .State.Health}}{{.State.Health.St
 container_started()  { docker inspect -f '{{.State.StartedAt}}' "$CONTAINER_NAME" 2>/dev/null || echo ""; }
 container_exitcode() { docker inspect -f '{{.State.ExitCode}}' "$CONTAINER_NAME" 2>/dev/null || echo "?"; }
 
+# How often Docker has restarted this container. With restart:unless-stopped
+# a container that dies immediately is "running" often enough to fool a
+# plain liveness test, so this is how a crash loop is told apart from a slow
+# start.
+container_restart_count() {
+    local n
+    n="$(docker inspect -f '{{.RestartCount}}' "$CONTAINER_NAME" 2>/dev/null)"
+    [[ "$n" =~ ^[0-9]+$ ]] && printf '%s' "$n" || printf '0'
+}
+
 container_uptime_seconds() {
     local started epoch
     started="$(container_started)"

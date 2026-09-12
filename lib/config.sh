@@ -389,10 +389,27 @@ config_persist() {
 # Docker Compose gets its own generated file. Keeping it separate means the
 # hand-editable configuration never has to satisfy Compose's quoting rules,
 # and Compose never sees a setting that is none of its business.
+# The host's time zone, asked for in the order systems actually answer.
+# /etc/timezone alone is not enough: modern systemd hosts do not have it,
+# and reading only that file hands the container UTC on a machine set to
+# Europe/Berlin - silently, which is the worst way to be wrong about time.
+_host_timezone() {
+    local tz
+    tz="$(timedatectl show -p Timezone --value 2>/dev/null)"
+    [[ -n "$tz" ]] && { printf '%s' "$tz"; return; }
+
+    tz="$(readlink -f /etc/localtime 2>/dev/null)"
+    tz="${tz#/usr/share/zoneinfo/}"
+    [[ -n "$tz" && "$tz" != /* ]] && { printf '%s' "$tz"; return; }
+
+    tz="$(cat /etc/timezone 2>/dev/null)"
+    printf '%s' "${tz:-UTC}"
+}
+
 config_write_compose_env() {
     local tz mem
     tz="$(cfg TIMEZONE)"
-    [[ "$tz" == "system" ]] && tz="$(cat /etc/timezone 2>/dev/null || echo UTC)"
+    [[ "$tz" == "system" ]] && tz="$(_host_timezone)"
     # Compose reads an empty mem_limit as a syntax error; 0 is its way of
     # saying "no limit".
     mem="$(cfg MEMORY_LIMIT)"; [[ -n "$mem" ]] || mem="0"

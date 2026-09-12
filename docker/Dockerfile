@@ -45,7 +45,8 @@ RUN dpkg --add-architecture i386 \
 # IDs of the service user it created.
 RUN groupadd -g "${PGID}" coop \
  && useradd -u "${PUID}" -g "${PGID}" -m -d /home/coop -s /bin/bash coop \
- && install -d -o coop -g coop /server /data
+ && install -d -o coop -g coop /server /data \
+ && install -d -o coop -g coop -m 0700 /home/coop/.runtime
 
 COPY entrypoint.sh coop-cmd healthcheck.sh /usr/local/bin/
 RUN chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/coop-cmd /usr/local/bin/healthcheck.sh
@@ -56,6 +57,7 @@ ENV HOME=/home/coop \
     WINEDEBUG=-all \
     WINEDLLOVERRIDES="mscoree,mshtml=" \
     COOP_FIFO=/tmp/coop.cmd \
+    XDG_RUNTIME_DIR=/home/coop/.runtime \
     PATH="/opt/wine-stable/bin:/opt/wine-staging/bin:/opt/wine-devel/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 USER coop

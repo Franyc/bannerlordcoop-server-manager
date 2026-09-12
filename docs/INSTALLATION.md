@@ -61,8 +61,8 @@ System compatibility
     Kernel             6.8.0-41-generic
   + Privileges         running as root
   + Package manager    apt
-  ! Required tools     will be installed: jq rsync
-  ! Docker Engine      not installed - will be installed from Docker's own repository
+  > Required tools     will be installed: jq rsync
+  > Docker Engine      not installed - will be installed from Docker's own repository
   + Memory             7940 MB
   + Disk space         184 GB free at /srv
   + Game port          UDP 4200 is free
@@ -97,11 +97,17 @@ can do too, so there is one implementation rather than two.
 | 1 | Compatibility check (read-only) |
 | 2 | Setup mode: default or advanced |
 | 3 | Configuration questions |
-| 4 | Steam authentication |
-| 5 | Summary, and the point of no return |
-| 6 | Dependencies, directories, image build, download |
-| 7 | First start |
-| 8 | Validation |
+| 4 | Summary, and the point of no return |
+| 5 | Dependencies: Docker, tools, service user |
+| 6 | Steam authentication |
+| 7 | Directories, configuration, image build, download |
+| 8 | First start and validation |
+
+The confirmation at step 4 comes before Steam rather than after it, which
+is a deliberate departure from the obvious order. Authenticating with
+Steam needs SteamCMD, SteamCMD runs in a container, and installing Docker
+changes your host. Putting the summary first is what makes "nothing has
+been changed yet" true when it is printed.
 
 ## Default setup
 
@@ -159,11 +165,17 @@ sudo coop steam login
 ```
 
 ```bash
-sudo coop install --default --non-interactive --save-name "Customer Campaign" --server-password "s3cret" --game-port 4210 --backup-keep-auto 24
+sudo coop install --default --non-interactive --yes --save-name "Customer Campaign" --server-password "s3cret" --game-port 4210 --backup-keep-auto 24
 ```
 
 Steam Guard cannot be answered without a terminal, so authenticate once
 first. After that nothing prompts.
+
+`--yes` is required, not decorative. Installing a server onto a host is a
+consequential act, and `--non-interactive` promises never to answer a
+confirmation on your behalf. Leaving it out gets you exit 10 and the
+summary, which is also a convenient way to preview what a provisioning
+run would do.
 
 A missing required value is exit 10, naming the flag. A destructive step
 without `--yes` is exit 10 as well - there are no hidden confirmations.
@@ -171,7 +183,7 @@ without `--yes` is exit 10 as well - there are no hidden confirmations.
 Settings can also come from a file:
 
 ```bash
-sudo coop install --non-interactive --config /root/instance.env
+sudo coop install --non-interactive --yes --config /root/instance.env
 ```
 
 ## Ports and firewall

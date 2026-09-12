@@ -63,6 +63,13 @@ _auto_backup_redundant() {
 }
 
 # backup_create <type> [note]
+#
+# The path of the new archive comes back in BACKUP_LAST_ARCHIVE rather than
+# on stdout. Returning it on stdout invites `a="$(backup_create ...)"`,
+# which runs the whole function in a subshell - and the temporary directory
+# it registered for cleanup is then forgotten when that subshell ends. That
+# is precisely how a staging directory was left behind by every backup.
+BACKUP_LAST_ARCHIVE=""
 backup_create() {
     local type="${1:-manual}" note="${2:-}"
     local stamp name archive staging
@@ -85,7 +92,7 @@ backup_create() {
     stamp="$(date +%Y%m%d-%H%M%S)"
     name="${type}-${stamp}.tar.gz"
     archive="$DIR_BACKUPS/$name"
-    staging="$(make_temp_dir "$DIR_BACKUPS")"
+    make_temp_dir "$DIR_BACKUPS" staging
 
     _backup_write_manifest "$staging/manifest.json" "$type" "$stamp" "$note"
     _backup_write_readme   "$staging/BACKUP-INFO.txt" "$type" "$stamp" "$note"
@@ -112,8 +119,8 @@ backup_create() {
         md5sum "$DIR_SAVES/$(cfg SAVE_NAME).sav" | cut -d' ' -f1 >"$DIR_STATE/.last-auto-hash"
     fi
 
+    BACKUP_LAST_ARCHIVE="$archive"
     backup_prune
-    printf '%s' "$archive"
 }
 
 _backup_write_manifest() {
@@ -186,6 +193,23 @@ backup_prune() {
 
     _backup_prune_by_age
     _backup_prune_by_size
+    _backup_sweep_stale_temp
+}
+
+# An EXIT trap does not run when a process is killed outright or the machine
+# loses power, so trap-based cleanup cannot be the only defence against
+# stray staging directories - each of which holds a full copy of a campaign.
+# Anything older than an hour is certainly not in use any more.
+_backup_sweep_stale_temp() {
+    local d
+    while IFS= read -r d; do
+        [[ -n "$d" ]] || continue
+        debug "removing stale staging directory $(basename "$d")"
+        rm -rf -- "$d"
+    done < <(find "$DIR_BACKUPS" "$INSTALL_DIR" -maxdepth 1 -type d \
+                  -name '.coop-tmp.*' -mmin +60 2>/dev/null
+             find "$INSTALL_DIR" -maxdepth 1 -type d \
+                  -name '.restore-old-*' -mmin +60 2>/dev/null)
 }
 
 _backup_files_of_type() {
@@ -411,7 +435,7 @@ backup_restore() {
     confirm "Continue?" no || { log "Cancelled."; return 0; }
 
     # 1. staging on the same filesystem, so the swap below is a rename
-    staging="$(make_temp_dir "$INSTALL_DIR")"
+    make_temp_dir "$INSTALL_DIR" staging
     log "Unpacking to a staging directory"
     tar -xzf "$archive" -C "$staging" \
         || fail "$EX_BACKUP" "Could not unpack the archive."
@@ -461,9 +485,16 @@ backup_restore() {
     config_write_compose_env
     server_config_render
 
-    # 7. start and verify
+    # 7. The swap is complete, so the displaced copies have done their job.
+    #    They are removed whether or not the server starts: the route back
+    #    is the pre-restore backup taken in step 6, which is a single
+    #    archive rather than three loose directories. Keeping them "just in
+    #    case" would leave a full copy of the campaign behind after every
+    #    failed restore, without anything ever cleaning it up.
+    for dir in "${swap_done[@]}"; do rm -rf -- "${dir#*:}"; done
+
+    # 8. start and verify
     if server_start; then
-        for dir in "${swap_done[@]}"; do rm -rf -- "${dir#*:}"; done
         ok "Restore complete"
         out_line ""
         out_line "  Campaign : $(cfg SAVE_NAME)  $(pulse_time)"

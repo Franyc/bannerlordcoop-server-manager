@@ -145,17 +145,24 @@ cleanup_run() {
     _CLEANUP_PATHS=()
 }
 
-# make_temp_dir [parent]
+# make_temp_dir <parent> <variable-name>
 #
 # Pass the parent when the result will later be moved into place: a rename
 # is only atomic within one filesystem.
+#
+# The result comes back through a named variable rather than on stdout, and
+# that is not a style choice. `dir="$(make_temp_dir ...)"` runs the function
+# in a subshell, so cleanup_register() would record the path in a copy of
+# the array that dies with the subshell - and the EXIT trap in the parent
+# would never remove it. That is exactly how every backup silently left a
+# directory behind.
 make_temp_dir() {
-    local parent="${1:-${TMPDIR:-/tmp}}" d
+    local parent="${1:-${TMPDIR:-/tmp}}" __var="${2:?make_temp_dir needs a variable name}" d
     mkdir -p -- "$parent" || die "$EX_RUNTIME" "Cannot create directory: $parent"
     d="$(mktemp -d "${parent}/.coop-tmp.XXXXXXXX")" \
         || die "$EX_RUNTIME" "Cannot create a temporary directory in $parent"
     cleanup_register "$d"
-    printf '%s\n' "$d"
+    printf -v "$__var" '%s' "$d"
 }
 
 install_traps() {

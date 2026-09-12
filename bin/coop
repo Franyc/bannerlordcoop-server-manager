@@ -236,12 +236,30 @@ cmd_install() {
     fi
     config_validate_all
 
-    # ---- [4/8] steam ---------------------------------------------------
+    # ---- [4/8] summary ---------------------------------------------------
+    # The confirmation comes before anything is installed, which is why it
+    # sits ahead of Steam rather than after it: authenticating with Steam
+    # needs SteamCMD, SteamCMD runs in a container, and installing Docker
+    # is a change to the host. Up to this line the promise still holds -
+    # nothing on this system has been touched.
     out_line ""
-    out_line "[4/8] Steam authentication"
+    out_line "[4/8] Summary"
+    provision_summary
+    confirm "Install with these settings?" yes || { log "Nothing was changed."; exit 0; }
+
+    # ---- [5/8] dependencies ----------------------------------------------
+    out_line ""
+    out_line "[5/8] Dependencies"
+    acquire_lock install
+    deps_install_base
+    deps_install_docker
+    deps_ensure_service_user
+    deps_suggest_daemon_config
+
+    # ---- [6/8] steam ------------------------------------------------------
+    out_line ""
+    out_line "[6/8] Steam authentication"
     if [[ "$(cfg INSTALL_CHANNEL)" == "workshop" ]]; then
-        deps_install_base
-        deps_install_docker
         case "$(steam_status)" in
             absent)
                 if (( NON_INTERACTIVE )); then
@@ -257,36 +275,24 @@ cmd_install() {
         ok "Custom build channel - Steam is not used"
     fi
 
-    # ---- [5/8] summary --------------------------------------------------
+    # ---- [7/8] provisioning ----------------------------------------------
     out_line ""
-    out_line "[5/8] Summary"
-    provision_summary
-    confirm "Install with these settings?" yes || { log "Nothing was changed."; exit 0; }
-
-    # ---- [6/8] dependencies and provisioning ----------------------------
-    out_line ""
-    out_line "[6/8] Installation"
-    deps_install_base
-    deps_install_docker
-    deps_ensure_service_user
-    deps_suggest_daemon_config
-    acquire_lock install
+    out_line "[7/8] Installation"
     provision_run "$skip_download"
     state_set setup_profile "$mode"
     _install_cli_symlink
 
-    # ---- [7/8] start -----------------------------------------------------
+    # ---- [8/8] start and validation --------------------------------------
     out_line ""
-    out_line "[7/8] Starting the server"
+    out_line "[8/8] Starting the server"
     if (( skip_download )); then
         warn "Skipped the download, so there is nothing to start."
     else
         server_start || warn "The server did not reach 'serving'. See: coop logs"
     fi
 
-    # ---- [8/8] validation -------------------------------------------------
     out_line ""
-    out_line "[8/8] Validation"
+    out_line "Validation"
     provision_validate || true
 
     out_line "Installation complete."
@@ -431,9 +437,9 @@ cmd_backup() {
     done
 
     require_installation; require_root; acquire_lock backup
-    local archive; archive="$(backup_create manual "$note")"
+    backup_create manual "$note"
     if is_json; then
-        jq -n --arg file "$(basename "$archive")" --arg dir "$DIR_BACKUPS" \
+        jq -n --arg file "$(basename "$BACKUP_LAST_ARCHIVE")" --arg dir "$DIR_BACKUPS" \
             '{ok:true, file:$file, directory:$dir}'
     fi
 }

@@ -33,7 +33,12 @@ out_line() {
     printf '%s\n' "${1:-}"
 }
 
-# out_check <ok|warn|fail> <message>
+# out_check <ok|todo|warn|fail> <message>
+#
+# 'todo' is for something the installer is about to do on purpose - a
+# missing dependency it will install. Reporting that as a warning makes
+# every clean host ask "continue despite warnings?", which is noise for a
+# person and a hard stop for automation.
 #
 # Used by doctor and by the installer's validation step. The mark carries
 # the state, so the text does not have to repeat it.
@@ -41,6 +46,7 @@ out_check() {
     is_json && return 0
     case "$1" in
         ok)   printf '  %s+%s %s\n'  "$C_GRN" "$C_OFF" "$2" ;;
+        todo) printf '  %s>%s %s\n'  "$C_BLU" "$C_OFF" "$2" ;;
         warn) printf '  %s!%s %s\n'  "$C_YEL" "$C_OFF" "$2" ;;
         fail) printf '  %sx%s %s\n'  "$C_RED" "$C_OFF" "$2" ;;
         *)    printf '    %s\n' "$2" ;;

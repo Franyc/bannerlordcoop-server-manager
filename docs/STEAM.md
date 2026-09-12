@@ -95,7 +95,7 @@ sudo coop steam login
 ```
 
 ```bash
-sudo coop install --default --non-interactive --save-name "Campaign"
+sudo coop install --default --non-interactive --yes --save-name "Campaign"
 ```
 
 ## Signing out

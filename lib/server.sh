@@ -90,11 +90,24 @@ server_save() {
 #   0  serving
 #   1  timed out
 #   2  the container stopped on its own
+#   3  the container is crash looping
 wait_serving() {
-    local timeout="${1:-600}" waited=0
+    local timeout="${1:-600}" waited=0 restarts_before restarts_now
+    restarts_before="$(container_restart_count)"
+
     while (( waited < timeout )); do
         container_running || return 2
         server_is_serving && return 0
+
+        # A crash loop is not a slow start. With restart:unless-stopped a
+        # container that dies on every attempt still reads as "running"
+        # between attempts, so without this the full timeout would elapse
+        # before anyone was told - ten minutes before an update rolls back.
+        restarts_now="$(container_restart_count)"
+        if (( restarts_now - restarts_before >= 3 )); then
+            return 3
+        fi
+
         sleep 5; waited=$(( waited + 5 ))
     done
     return 1
@@ -115,6 +128,11 @@ server_start() {
     wait_serving "$timeout" || rc=$?
     case "$rc" in
         0) ok "Server is serving ('$(cfg SAVE_NAME)', $(pulse_time))"; return 0 ;;
+        3) # Mid-restart, the reported exit code is whatever Docker happened
+           # to be holding, so it is not worth printing. The log is.
+           warn "The server is not starting: the container exits at once and Docker keeps restarting it."
+           out_line "    See what it says:  coop logs -n 50"
+           return 2 ;;
         2) warn "The container exited during start-up (exit $(container_exitcode))."
            _explain_exit_code "$(container_exitcode)"
            return 2 ;;

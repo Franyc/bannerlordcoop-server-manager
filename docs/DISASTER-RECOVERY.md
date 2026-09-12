@@ -55,7 +55,7 @@ ones from the backup. If you want to skip straight past them:
 
 ```bash
 sudo coop steam login
-sudo coop install --default --non-interactive --save-name placeholder
+sudo coop install --default --non-interactive --yes --save-name placeholder
 ```
 
 This downloads about 6 GB from Steam and leaves you with a running server
@@ -177,7 +177,7 @@ An untested backup is a hope. Once, on a spare machine or a cheap VPS by
 the hour:
 
 ```bash
-sudo ./install.sh --default --non-interactive --save-name placeholder
+sudo ./install.sh --default --non-interactive --yes --save-name placeholder
 scp your-backup.tar.gz test-host:/srv/bannerlordcoop/backups/
 sudo coop backup restore <id>
 coop status
