@@ -99,7 +99,7 @@ coop status
   Uptime             1m 8s
   Campaign           My Campaign  (Summer 11, 1084)
   Players            0  (1161 parties)
-  Connection         UDP 4200  (password set)
+  Connect to         203.0.113.17:4200  (password set)
   Install channel    Steam Workshop
   Coop build         build 2026-09-06 / Mount & Blade II: Bannerlord v1.4.8
 ```

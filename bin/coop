@@ -325,23 +325,34 @@ cmd_install() {
 
     out_line "Installation complete."
     out_line ""
-    out_kv "Connect to" "UDP $(cfg GAME_PORT) on this host's public address"
+    out_kv "Connect to" "$(host_primary_address):$(cfg GAME_PORT)"
+    out_kv "Password"   "$( [[ -n "$(cfg SERVER_PASSWORD)" ]] && printf 'set' || printf 'none' )"
+    out_kv "Campaign"   "$(cfg SAVE_NAME)"
     out_kv "Next"       "coop status"
+    out_line ""
+    out_line "  Players join through Direct Connect in the co-op menu, over UDP."
+
+    local others; others="$(host_addresses | tail -n +2 | tr '\n' ' ')"
+    [[ -n "${others// /}" ]] && out_line "  Other addresses on this host: ${others% }"
+
     out_line ""
     _install_firewall_note
     out_line ""
 }
 
 # Says what is actually true on this host, rather than a generic reminder.
+# Phrased as troubleshooting rather than as a step. UDP 4200 is open on
+# most hosts already, and presenting it as a required action sends people
+# off to configure something that usually needs no configuring.
 _install_firewall_note() {
-    out_line "  Open UDP $(cfg GAME_PORT) at your hosting provider. That firewall is the"
-    out_line "  one that governs this port."
+    out_line "  If somebody cannot connect, the usual cause is UDP $(cfg GAME_PORT) being"
+    out_line "  blocked at your hosting provider. That firewall is the one that"
+    out_line "  governs this port."
     if [[ "$(firewall_state)" == "active" ]]; then
         out_line ""
-        out_line "  ufw is active on this host, and it does NOT cover the game port:"
-        out_line "  Docker publishes container ports ahead of ufw's rules. Allowing or"
-        out_line "  denying UDP $(cfg GAME_PORT) in ufw would change nothing, which is why"
-        out_line "  this installer does not write such a rule."
+        out_line "  ufw is active here, but it is not the place to look: Docker"
+        out_line "  publishes container ports ahead of ufw's rules, so allowing or"
+        out_line "  denying UDP $(cfg GAME_PORT) there changes nothing."
     fi
 }
 

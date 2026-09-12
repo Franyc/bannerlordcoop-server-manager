@@ -85,7 +85,20 @@ password and your Steam login, and downloads about 6 GB. When it finishes:
 coop status
 ```
 
-Players connect with **Direct Connect** to `<your-server-ip>:4200`.
+The installer ends by printing the address to connect to:
+
+```
+Installation complete.
+
+  Connect to         203.0.113.17:4200
+  Password           set
+  Campaign           My Campaign
+  Next               coop status
+
+  Players join through Direct Connect in the co-op menu, over UDP.
+```
+
+`coop status` shows the same address at any time.
 
 ### Default setup
 

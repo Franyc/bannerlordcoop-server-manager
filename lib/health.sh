@@ -58,6 +58,7 @@ status_report() {
             --arg health "${health:-none}" \
             --arg backup "$last_backup" \
             --arg instance "$INSTANCE_ID" \
+            --arg address "$(host_primary_address)" \
             --argjson players "${players:-0}" \
             --argjson port "$(cfg GAME_PORT)" \
             --argjson uptime "${uptime:-0}" \
@@ -69,7 +70,8 @@ status_report() {
                save_name:$save, campaign_date:$campaign, players:$players,
                install_channel:$channel, coop_version:$version,
                manager_version:$manager, container_health:$health,
-               game_port:$port, password_set:$password, uptime_seconds:$uptime,
+               game_port:$port, host_address:$address,
+               password_set:$password, uptime_seconds:$uptime,
                last_backup:$backup, last_backup_age_seconds:$backup_age,
                update_available:$update
              }'
@@ -101,7 +103,7 @@ status_report() {
 
     out_kv "Campaign" "$(cfg SAVE_NAME)$( [[ -n "$(pulse_time)" ]] && printf '  (%s)' "$(pulse_time)" )"
     (( running )) && out_kv "Players" "$players$( [[ -n "$(pulse_field parties)" ]] && printf '  (%s parties)' "$(pulse_field parties)" )"
-    out_kv "Connection" "UDP $(cfg GAME_PORT)$( [[ -n "$(cfg SERVER_PASSWORD)" ]] && printf '  (password set)' || printf '  (no password)' )"
+    out_kv "Connect to" "$(host_primary_address):$(cfg GAME_PORT)$( [[ -n "$(cfg SERVER_PASSWORD)" ]] && printf '  (password set)' || printf '  (no password)' )"
     out_kv "Install channel" "$( [[ "$(cfg INSTALL_CHANNEL)" == workshop ]] && printf 'Steam Workshop' || printf 'Custom build' )"
     out_kv "Coop build" "$(server_version)"
     out_kv "Manager" "v$MANAGER_VERSION"

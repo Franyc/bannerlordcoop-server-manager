@@ -240,6 +240,33 @@ find_free_port() {
     return 1
 }
 
+# ---------------------------------------------------------------- addresses --
+# The addresses a player would actually type. On a VPS the first one is
+# usually the public address; on a machine behind NAT it is the address
+# inside that network, which is still what a player on the same network
+# needs. Telling somebody to use "this host's public address" and leaving
+# them to find it is not an answer.
+# Docker's own bridges (docker0, br-*, veth*) carry addresses too, and
+# offering 172.17.0.1 to somebody looking for a server address is worse
+# than offering nothing. They are filtered by interface name, and by
+# address range for the fallback path where the name is not available.
+host_addresses() {
+    local out
+    out="$(ip -4 -o addr show scope global 2>/dev/null \
+            | awk '$2 !~ /^(docker|br-|veth|lo)/ {split($4,a,"/"); print a[1]}')"
+    if [[ -z "$out" ]]; then
+        out="$(hostname -I 2>/dev/null | tr ' ' '\n' \
+                | grep -vE '^(172\.1[6-9]\.|172\.2[0-9]\.|172\.3[01]\.)')"
+    fi
+    printf '%s\n' "$out" | grep -vE '^(127\.|$)' || true
+}
+
+host_primary_address() {
+    local first
+    first="$(host_addresses | head -1)"
+    printf '%s' "${first:-this host}"
+}
+
 # ----------------------------------------------------------------- firewall --
 # WHY THIS REPORTS AND DOES NOT CONFIGURE
 #
