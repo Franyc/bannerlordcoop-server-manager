@@ -169,7 +169,21 @@ config_load ${CONFIG_FILE:+--config "$CONFIG_FILE"}
 # Most commands are meaningless without an installation, and saying so
 # plainly beats a stack of confusing errors further down.
 require_installation() {
-    installation_present || fail "$EX_CONFIG" \
+    installation_present && return 0
+
+    # An installation directory that exists but cannot be entered is a
+    # permission problem, not a missing installation. It is 0750 on
+    # purpose, because it holds the server password, so this is what an
+    # ordinary user sees - and "no installation found" would send them off
+    # to install a second one over the top of the first.
+    if [[ -d "$INSTALL_DIR" && ! -x "$INSTALL_DIR" ]]; then
+        fail "$EX_CONFIG" \
+            "Cannot read $INSTALL_DIR as $(id -un)." \
+            "The directory belongs to root and the service user, because it holds the server password." \
+            "Try:  sudo coop ${COOP_COMMAND}"
+    fi
+
+    fail "$EX_CONFIG" \
         "No Bannerlord Coop installation found in $INSTALL_DIR." \
         "Install one with:  sudo coop install" \
         "Or point at an existing one:  coop --install-dir <path> ${COOP_COMMAND}"

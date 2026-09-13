@@ -74,35 +74,102 @@ provision_collect_default() {
 }
 
 # Advanced setup. Everything the default mode decides silently.
+#
+# Every question carries a sentence or two saying what the answer affects.
+# A prompt like "Instance id [default]:" on its own tells a reader nothing,
+# and a setup that asks for values it has not explained is a setup people
+# answer at random.
 provision_collect_advanced() {
     local value
 
     provision_collect_default
 
     out_title "Installation"
-    ask value "Instance id" "$(cfg INSTANCE_ID)";            cfg_set INSTANCE_ID "$value"
+
+    out_line "  A short name for this installation. It shapes the container, the"
+    out_line "  lock file and the service names, so two servers on one machine"
+    out_line "  need different ones. With a single server, leave it alone."
+    ask value "Instance id" "$(cfg INSTANCE_ID)"; cfg_set INSTANCE_ID "$value"
+
+    out_line ""
+    out_line "  Where the campaign, backups, configuration and the 6 GB of game"
+    out_line "  files are kept. Everything the server owns lives under it."
     ask value "Installation directory" "$(cfg INSTALL_DIR)"; cfg_set INSTALL_DIR "$value"
-    ask value "Display name" "$(cfg SERVER_LABEL)";          cfg_set SERVER_LABEL "$value"
+
+    out_line ""
+    out_line "  A label for your own benefit. It appears in 'coop status' and in"
+    out_line "  backup manifests. Players never see it: they join by address."
+    ask value "Display name" "$(cfg SERVER_LABEL)"; cfg_set SERVER_LABEL "$value"
+
+    out_line ""
+    out_line "  Where the server files come from. 'workshop' downloads them from"
+    out_line "  Steam, which is what almost everyone wants. 'custom' installs a"
+    out_line "  build you already have in a directory on this machine."
     ask value "Install channel (workshop/custom)" "$(cfg INSTALL_CHANNEL)"
     cfg_set INSTALL_CHANNEL "$value"
     if [[ "$(cfg INSTALL_CHANNEL)" == "custom" ]]; then
+        out_line ""
+        out_line "  The directory holding BannerlordCoopServer.exe and its files."
         ask value "Directory holding the server files" "$(cfg CUSTOM_SOURCE_PATH)"
         cfg_set CUSTOM_SOURCE_PATH "$value"
     fi
 
     out_title "Server"
-    ask value "Game port (UDP)" "$(cfg GAME_PORT)";               cfg_set GAME_PORT "$value"
-    ask value "Autosave interval in minutes" "$(cfg AUTOSAVE_MINUTES)"; cfg_set AUTOSAVE_MINUTES "$value"
+
+    out_line "  The port players type after the address, as in 203.0.113.17:4200."
+    out_line "  Change it only if something else on this machine already uses it."
+    ask value "Game port (UDP)" "$(cfg GAME_PORT)"; cfg_set GAME_PORT "$value"
+
+    out_line ""
+    out_line "  How often the world is written to disk while people play. Lower"
+    out_line "  means less lost on a crash and slightly more disk churn."
+    ask value "Autosave interval in minutes" "$(cfg AUTOSAVE_MINUTES)"
+    cfg_set AUTOSAVE_MINUTES "$value"
+
+    out_line ""
+    out_line "  Whether to advertise this server in a PUBLIC Steam lobby, where"
+    out_line "  strangers can find it. It needs a logged-in Steam client on this"
+    out_line "  machine and does nothing without one. For a private group: false."
     ask value "Advertise a public Steam lobby (true/false)" "$(cfg STEAM_ADVERTISE)"
     cfg_set STEAM_ADVERTISE "$value"
-    ask value "Time zone ('system' for the host's)" "$(cfg TIMEZONE)"; cfg_set TIMEZONE "$value"
-    ask value "Memory limit (e.g. 4g, empty for none)" "$(cfg MEMORY_LIMIT)"; cfg_set MEMORY_LIMIT "$value"
+
+    out_line ""
+    out_line "  The time zone the server stamps its log entries with. 'system'"
+    out_line "  takes this machine's, so the logs match the rest of the host."
+    ask value "Time zone ('system' for the host's)" "$(cfg TIMEZONE)"
+    cfg_set TIMEZONE "$value"
+
+    out_line ""
+    out_line "  A ceiling for the server's memory, such as 4g. The server uses"
+    out_line "  about 1 to 1.6 GB; a limit stops a runaway process from taking"
+    out_line "  the whole machine down with it. Empty means no limit."
+    ask value "Memory limit (e.g. 4g, empty for none)" "$(cfg MEMORY_LIMIT)"
+    cfg_set MEMORY_LIMIT "$value"
 
     out_title "Backups"
-    ask value "Enable automatic backups (true/false)" "$(cfg BACKUP_ENABLED)"; cfg_set BACKUP_ENABLED "$value"
+    out_line "  A backup holds the campaign, the server settings and the gameplay"
+    out_line "  settings together. It is the only part of an installation that"
+    out_line "  cannot be rebuilt from Steam, so leaving this on is recommended."
+    out_line ""
+    ask value "Enable automatic backups (true/false)" "$(cfg BACKUP_ENABLED)"
+    cfg_set BACKUP_ENABLED "$value"
     if cfg_bool BACKUP_ENABLED; then
-        ask value "Schedule (systemd OnCalendar)" "$(cfg BACKUP_SCHEDULE)"; cfg_set BACKUP_SCHEDULE "$value"
-        ask value "Keep how many automatic backups" "$(cfg BACKUP_KEEP_AUTO)"; cfg_set BACKUP_KEEP_AUTO "$value"
+        out_line ""
+        out_line "  When they run, in systemd's OnCalendar syntax: 'hourly',"
+        out_line "  'daily', or something like 'Mon *-*-* 03:00:00'. A run is"
+        out_line "  skipped when the campaign has not advanced, so hourly is cheap."
+        ask value "Schedule (systemd OnCalendar)" "$(cfg BACKUP_SCHEDULE)"
+        cfg_set BACKUP_SCHEDULE "$value"
+
+        out_line ""
+        out_line "  How many automatic backups to keep. Each is 12 to 25 MB."
+        ask value "Keep how many automatic backups" "$(cfg BACKUP_KEEP_AUTO)"
+        cfg_set BACKUP_KEEP_AUTO "$value"
+
+        out_line ""
+        out_line "  Two further limits, in case a server runs untouched for a long"
+        out_line "  time. Both apply to automatic backups only; the ones you make"
+        out_line "  by hand are never removed by them. 0 disables a limit."
         ask value "Delete automatic backups older than N days (0 = never)" "$(cfg BACKUP_MAX_AGE_DAYS)"
         cfg_set BACKUP_MAX_AGE_DAYS "$value"
         ask value "Total backup size cap in GB (0 = no cap)" "$(cfg BACKUP_MAX_TOTAL_GB)"
@@ -110,15 +177,22 @@ provision_collect_advanced() {
     fi
 
     out_title "Updates"
-    out_line "  Automatic updates are off by default because every player must run"
-    out_line "  the same Coop build, so an unattended update locks out anyone who"
-    out_line "  has not updated their client."
+    out_line "  The server can watch for new Coop builds. Installing one is a"
+    out_line "  separate decision, because every player has to run the same build:"
+    out_line "  an update applied overnight locks out everyone who has not updated"
+    out_line "  their own client yet."
     out_line ""
     ask value "Check for updates on a schedule (true/false)" "$(cfg UPDATE_CHECK_ENABLED)"
     cfg_set UPDATE_CHECK_ENABLED "$value"
     if cfg_bool UPDATE_CHECK_ENABLED; then
+        out_line ""
+        out_line "  When to check, in the same OnCalendar syntax as the backups."
         ask value "Update check schedule (systemd OnCalendar)" "$(cfg UPDATE_CHECK_SCHEDULE)"
         cfg_set UPDATE_CHECK_SCHEDULE "$value"
+
+        out_line ""
+        out_line "  Whether a found update is also installed, unattended. Say true"
+        out_line "  only if your group updates their clients together."
         ask value "Install updates automatically (true/false)" "$(cfg AUTO_UPDATE)"
         cfg_set AUTO_UPDATE "$value"
     fi

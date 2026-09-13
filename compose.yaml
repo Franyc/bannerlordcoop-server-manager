@@ -34,9 +34,16 @@ services:
     # The only port that has to be reachable from the internet. The Steam
     # game-server ports (UDP 27315/27316) are used locally only.
     #
+    # Both sides of the mapping are the same number on purpose. The server
+    # inside the container listens on the port from server-config.json,
+    # which is this same setting, so a fixed container-side port would
+    # forward traffic to one nobody is listening on. That is invisible at
+    # the default, where both numbers happen to be 4200, and breaks every
+    # server configured on any other port.
+    #
     # Note: Docker publishes ports past ufw. See docs/INSTALLATION.md.
     ports:
-      - "${COOP_GAME_PORT:-4200}:4200/udp"
+      - "${COOP_GAME_PORT:-4200}:${COOP_GAME_PORT:-4200}/udp"
 
     volumes:
       # Read-only on purpose. The server verifies its Coop assemblies with

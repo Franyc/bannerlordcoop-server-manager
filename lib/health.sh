@@ -147,8 +147,13 @@ doctor_run() {
     # asking "is the server healthy" must not get a clean bill of health
     # from a machine that has no server on it.
     if ! installation_present; then
-        _hc fail "Installation" "Not installed" \
-            "no installation in $INSTALL_DIR. Create one with: sudo coop install"
+        if [[ -d "$INSTALL_DIR" && ! -x "$INSTALL_DIR" ]]; then
+            _hc fail "Installation" "Not readable" \
+                "$INSTALL_DIR exists but cannot be read as $(id -un). Try: sudo coop doctor"
+        else
+            _hc fail "Installation" "Not installed" \
+                "no installation in $INSTALL_DIR. Create one with: sudo coop install"
+        fi
     else
         _doctor_configuration
         _doctor_data
@@ -375,6 +380,19 @@ _doctor_server() {
         esac
     else
         _hc warn "Server" "Container" "stopped (exit $(container_exitcode))"
+    fi
+
+    # The host port being bound proves only that Docker is listening. If
+    # the container exposes a different port, traffic arrives and is
+    # forwarded to one nobody is listening on, which looks from outside
+    # exactly like a blocked firewall.
+    if container_running; then
+        if [[ -n "$(docker port "$CONTAINER_NAME" "$(cfg GAME_PORT)/udp" 2>/dev/null)" ]]; then
+            _hc ok "Server" "Port mapping" "UDP $(cfg GAME_PORT) reaches the server"
+        else
+            _hc fail "Server" "Port mapping" \
+                "the container does not expose UDP $(cfg GAME_PORT), so traffic on the host port goes nowhere. Run: sudo coop config --apply"
+        fi
     fi
 
     if port_in_use "$(cfg GAME_PORT)" udp; then
