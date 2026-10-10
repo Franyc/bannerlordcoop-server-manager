@@ -28,9 +28,15 @@ readonly EX_UPDATE_AVAILABLE=100 # only with `update --check --exit-status`
 # Set by bin/coop from the command line before anything else runs.
 : "${NON_INTERACTIVE:=0}"
 : "${ASSUME_YES:=0}"
-# Set only by --accept-eula. Deliberately separate from --yes: a flag that
-# confirms an operation is not consent to a license.
-: "${ACCEPT_EULA:=0}"
+# Set only by --accept-eula, and deliberately separate from --yes: a flag
+# that confirms an operation is not consent to a license.
+#
+# Never taken from the environment, unlike the flags above. ACCEPT_EULA is
+# a common variable that other software asks for - Microsoft's SQL tools do,
+# and GitHub's runners export ACCEPT_EULA=Y for them - and one exported for
+# some other program must not accept these terms. It is assigned here, not
+# defaulted, so nothing inherited survives.
+COOP_ACCEPT_EULA=0
 : "${QUIET:=0}"
 : "${VERBOSE:=0}"
 : "${OUTPUT_FORMAT:=human}"

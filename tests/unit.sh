@@ -83,9 +83,19 @@ ASSUME_YES=0
 license_accepted_for "$T/terms" && nok "a refusal was recorded as an acceptance"
 pass "terms are never accepted without consent, and --yes is not consent"
 
-ACCEPT_EULA=1
+# An ACCEPT_EULA exported for some other program - GitHub's runners export
+# ACCEPT_EULA=Y for Microsoft's SQL tools - must neither accept these terms
+# nor break the run.
+for inherited in Y 1; do
+    env ACCEPT_EULA="$inherited" COOP_ACCEPT_EULA=1 COOP_ROOT="$COOP_ROOT" \
+        bash -c 'set -u; . "$COOP_ROOT/lib/common.sh"; [[ "$COOP_ACCEPT_EULA" == 0 ]]' \
+        || nok "an inherited environment variable counted as --accept-eula ($inherited)"
+done
+pass "nothing in the environment accepts license terms"
+
+COOP_ACCEPT_EULA=1
 license_require "$T/terms" >/dev/null 2>&1 || nok "--accept-eula did not accept"
-ACCEPT_EULA=0
+COOP_ACCEPT_EULA=0
 license_accepted_for "$T/terms" || nok "an acceptance was not recorded"
 [[ "$(license_acceptance "$(license_id "$T/terms")" | jq -r .method)" == "--accept-eula" ]] \
     || nok "the acceptance does not say how it was given"

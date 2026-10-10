@@ -102,7 +102,7 @@ license_require() {
 
     _license_notice "$dir"
 
-    if (( ACCEPT_EULA )); then
+    if (( COOP_ACCEPT_EULA )); then
         license_record "$id" "--accept-eula" || return "$EX_LICENSE"
         ok "License terms accepted (--accept-eula)"
         return 0

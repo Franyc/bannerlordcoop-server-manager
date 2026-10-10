@@ -144,7 +144,7 @@ while (( $# )); do
         --json)            OUTPUT_FORMAT="json"; shift ;;
         --non-interactive) NON_INTERACTIVE=1; shift ;;
         --yes|-y)          ASSUME_YES=1; shift ;;
-        --accept-eula)     ACCEPT_EULA=1; shift ;;
+        --accept-eula)     COOP_ACCEPT_EULA=1; shift ;;
         --quiet|-q)        QUIET=1; shift ;;
         --verbose|-v)      VERBOSE=1; shift ;;
         --config)          CONFIG_FILE="${2:?--config needs a file}"; shift 2 ;;
