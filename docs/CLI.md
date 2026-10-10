@@ -15,6 +15,7 @@ These work with any command and may appear before or after it.
 | `--json` | Machine-readable output, where the command supports it |
 | `--non-interactive` | Never prompt; a missing required value is an error |
 | `--yes`, `-y` | Answer confirmations with yes |
+| `--accept-eula` | Accept the Coop server's license terms without a prompt. `--yes` never does. Read them first. |
 | `--quiet`, `-q` | Only warnings and errors |
 | `--verbose`, `-v` | Extra detail |
 | `-h`, `--help` | Usage |
@@ -42,13 +43,34 @@ changed until after the summary is confirmed.
 Running it again on an existing installation offers update, repair,
 reconfigure or exit. It never silently overwrites a campaign.
 
+Before the first start, the Coop server's own license terms are put to
+you. Unattended, `--accept-eula` accepts them; without it the installation
+completes, the server is not started, and the command exits 80. See
+[License terms](#license-terms).
+
 ```bash
 sudo coop install --advanced
 ```
 
 ```bash
-sudo coop install --default --non-interactive --yes --save-name "Customer Campaign" --server-password "s3cret" --game-port 4210
+sudo coop install --default --non-interactive --yes --accept-eula --save-name "Customer Campaign" --server-password "s3cret" --game-port 4210
 ```
+
+### License terms
+
+| Command | Root | Notes |
+|---|---|---|
+| `coop eula` | no | Does the installed build ship terms, and are they accepted? `--json`. |
+| `coop eula show` | no | Print them, through a pager on a terminal |
+| `coop eula accept` | yes | Accept them, after a question; `--accept-eula` skips the question |
+
+From Coop v0.1.6 on, the dedicated server ships with an EULA and a license
+of its own and will not host a campaign until they have been accepted.
+Acceptance is recorded against a checksum of exactly the documents you
+accepted. A build whose terms differ asks again; `coop update` and
+`coop install` ask on their own when they meet new terms. The answer is
+yours to give: the manager never accepts on anyone's behalf, and `--yes`
+does not count as consent.
 
 ## Running the server
 
@@ -64,7 +86,8 @@ sudo coop install --default --non-interactive --yes --save-name "Customer Campai
 
 `coop start` returns only once the server reports that it is serving, which
 on a grown campaign takes about two minutes. It exits 50 if that never
-happens.
+happens, 80 if the build's license terms have not been accepted, and 10 if
+`SAVE_NAME` names no campaign and no new world was asked for.
 
 Console commands the server accepts: `status`, `players`, `save`, `say`,
 `kick`, `help`.
@@ -72,6 +95,62 @@ Console commands the server accepts: `status`, `players`, `save`, `say`,
 ```bash
 coop console players
 ```
+
+## Campaigns
+
+| Command | Root | Notes |
+|---|---|---|
+| `coop campaign list` | no | The campaigns in `saves/`, and which one is hosted. `--json`. Alias: `coop campaigns` |
+| `coop campaign use <name>` | yes | Host an existing campaign |
+| `coop campaign new <name>` | yes | Start a new world under a new name |
+
+The server hosts one campaign, the save named by `SAVE_NAME`. Both
+switching commands do the same four things in the same order: stop with a
+closing save, create a backup, change `SAVE_NAME`, start and wait until the
+server serves. If the server will not serve the new campaign, the previous
+one is put back and started. When players are connected, you are asked
+first; `--yes` answers for you.
+
+`campaign use` refuses a name with no campaign behind it and changes
+nothing. A different spelling of the same name in another case finds the
+campaign, as the server itself would. `campaign new` refuses a name that
+already has a campaign.
+
+```bash
+sudo coop campaign use "My Campaign"
+```
+
+```bash
+sudo coop campaign new "Second Campaign"
+```
+
+A new world is only ever created when it was asked for: at installation,
+with `campaign new`, or with `config --set SAVE_NAME=... --new-world`. Any
+other start with a name that has no save behind it is refused, so a typo
+cannot quietly send your players into an empty world.
+
+Not campaigns, and never listed: `default_new_game` (the template new
+worlds are made from), `<name>.backup1` and `.backup2` (generations the
+server keeps by itself), `coop_bug_report` and `TransferSave`.
+
+Gameplay settings (`mod-config.json`) are shared by every campaign on the
+server.
+
+## Players
+
+| Command | Root | Notes |
+|---|---|---|
+| `coop ban` | no | List banned Steam accounts. `--json`. |
+| `coop ban <steam64-id> [--name "<hero name>"]` | yes | Ban a Steam account |
+| `coop unban <steam64-id>` | yes | Lift a ban |
+
+From Coop v0.1.6 on, the server refuses the Steam accounts in its ban list
+when they try to join. It re-reads the list whenever it changes, so a ban
+needs no restart. The Steam64 id is the number in a player's profile
+address, `steamcommunity.com/profiles/<id>`. `--name` only notes who it
+was.
+
+The list lives in `config/steam-bans.json`, which every backup carries.
 
 ## Configuration
 
@@ -81,11 +160,16 @@ coop console players
 | `coop config --advanced` | yes | Include the rest |
 | `coop config --list` | no | Every setting, value and type. `--json`. |
 | `coop config --get KEY` | no | Print one value |
-| `coop config --set KEY=VALUE` | yes | Change one value |
+| `coop config --set KEY=VALUE` | yes | Change one value. `SAVE_NAME` must name a campaign unless `--new-world` is given |
 | `coop config --apply` | yes | Regenerate generated files, restart if needed |
 
-A change to a setting marked "restart required" offers a restart; in
-`--non-interactive` mode it does not, and you restart when it suits you.
+A change to a setting marked "restart required" offers a restart; without
+a terminal it does not, and you restart when it suits you.
+
+`coop config --set SAVE_NAME=...` refuses a name with no campaign behind
+it, for the same reason `coop campaign use` does. `--new-world` says that a
+new world is what you want. `coop campaign use` is the better route for a
+switch, because it also makes a backup and restarts.
 
 ## Software
 
@@ -94,6 +178,7 @@ A change to a setting marked "restart required" offers a restart; in
 | `coop update` | yes | Install a newer Coop build |
 | `coop update --check` | no | Only report. `--json`. |
 | `coop update --force` | yes | Install even when the check disagrees |
+| `coop update --accept-eula` | yes | Accept new license terms without a prompt |
 | `coop rollback` | yes | Return to the previous Coop build |
 | `coop steam status [--probe]` | no | Is the session usable? `--json`. |
 | `coop steam login` | yes | Authenticate with Steam |
@@ -154,6 +239,7 @@ Automation can tell failure classes apart:
 | 50 | Health check failed |
 | 60 | Backup or restore failed |
 | 70 | Another operation holds the lock |
+| 80 | The Coop server's license terms have not been accepted |
 | 100 | `update --check --exit-status` only: an update is available |
 
 ## Non-interactive behaviour
@@ -165,6 +251,7 @@ Automation can tell failure classes apart:
 | A required value is missing | asks | exit 10, naming the flag |
 | A destructive step needs confirmation | asks | exit 10 unless `--yes` |
 | The Steam session is missing | offers to log in | exit 30 with instructions |
+| New license terms | asks | exit 80 unless `--accept-eula`; `--yes` does not count |
 | Output | colour when on a terminal | plain; `--json` for machines |
 
 There are no hidden confirmations. A destructive operation without `--yes`
@@ -173,7 +260,8 @@ fails rather than proceeding.
 ## JSON output
 
 Supported by `status`, `doctor`, `config --list`, `backup list`,
-`backup info`, `backup`, `update --check`, `steam status` and `version`.
+`backup info`, `backup`, `update --check`, `steam status`, `eula`,
+`campaign list`, `ban` and `version`.
 
 Logs and progress always go to stderr, so stdout carries nothing but the
 JSON document:

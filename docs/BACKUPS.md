@@ -7,8 +7,8 @@ playable state:
 
 | | |
 |---|---|
-| `saves/` | The campaign: a `.sav` file with its matching `.json` |
-| `config/` | `server.env` and the generated `server-config.json` |
+| `saves/` | Every campaign: each `.sav` file with its matching `.json` |
+| `config/` | `server.env`, the generated `server-config.json`, the Steam ban list `steam-bans.json`, and the server's own `eula.txt` |
 | `coopdata/` | `mod-config.json`, the gameplay settings owned by the mod |
 
 Plus two descriptions of the archive itself: `manifest.json` for machines
@@ -86,7 +86,7 @@ The reason a backup exists determines how long it is kept.
 | Type | Created by |
 |---|---|
 | `auto` | The scheduled timer |
-| `manual` | `coop backup` |
+| `manual` | `coop backup`, and automatically before `coop campaign use` and `coop campaign new` |
 | `pre-update` | Automatically, before `coop update` |
 | `pre-restore` | Automatically, before `coop backup restore` |
 

@@ -31,6 +31,14 @@ coop status
   previous build, and an automatic rollback if the new one will not start.
 - **Restores as a transaction.** A restore is validated, staged, and swapped
   in. It is never unpacked over your campaign and left half-finished.
+- **Switches campaigns safely.** `coop campaign use` backs up, switches and
+  waits until the server serves. A mistyped name is refused instead of
+  quietly becoming a new, empty world.
+- **Leaves the license decision to you.** From Coop v0.1.6 the server comes
+  with license terms of its own. They are shown and put to you, never
+  accepted on your behalf, and asked again when they change.
+- **Keeps bans where they survive.** `coop ban` maintains the server's Steam
+  ban list in a place that updates leave alone and backups include.
 - **Scriptable.** Every command that reports something supports `--json`,
   exit codes distinguish failure classes, and `--non-interactive` never
   hides a prompt.
@@ -46,6 +54,7 @@ coop status
 | Disk | 25 GB minimum, 40 GB recommended. The game files occupy about 18 GB across three directories, plus backups. |
 | Network | UDP 4200 reachable from the internet |
 | Steam | An account that **owns Mount & Blade II: Bannerlord**. The Workshop download is not available anonymously. |
+| License | The Coop server's own terms (`EULA.md`, `LICENSE.txt`), which you accept during installation. Commercial hosting needs the Bannerlord Coop team's written permission. |
 
 Docker Engine, the Compose plugin and a handful of standard tools are
 installed for you if they are missing.
@@ -70,6 +79,47 @@ runtime and the game all live inside the container. What the host has to
 provide is x86_64, Docker and systemd. `coop install` checks your system
 and tells you where you stand before changing anything.
 
+## Getting a server
+
+### Rented from the Bannerlord Coop team
+
+If you would rather not look after a Linux machine at all, the Bannerlord
+Coop team rents managed servers to supporters on its **$20+ Patreon
+tiers**. Connect your Patreon account to your
+[bannerlordcoop.com](https://bannerlordcoop.com/) account, wait a few
+minutes, then look at
+[bannerlordcoop.com/servers](https://bannerlordcoop.com/servers).
+
+### Your own Linux server
+
+<a href="https://www.netcup.com/en">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/netcup-logo-white.svg">
+    <img src="docs/images/netcup-logo.svg" alt="netcup" width="150">
+  </picture>
+</a>
+
+> **Advertisement.** This project was tested on a server rented from
+> [netcup](https://www.netcup.com/en). New customers get **5 € off** with
+> the voucher code **`36nc17889838270`** (not valid for domains).
+
+| | [RS 1000 G12.5](https://www.netcup.com/en/server/root-server) | [VPS 1000 G12.5](https://www.netcup.com/en/server/vps) |
+|---|---|---|
+| CPU | 4 dedicated cores, AMD EPYC 9645 | 4 vCores (x86), shared |
+| Memory | 8 GB | 8 GB |
+| Disk | 128 GB NVMe | 128 GB SSD |
+| Price, October 2026 | 25.00 € a month | 16.68 € a month |
+
+Prices include 19 % German VAT, and both have a one-month term.
+
+The RS 1000 is the one used for testing. Its cores are dedicated, which
+suits a server that uses about 1.2 cores around the clock, even with
+nobody connected. The VPS 1000 shares its cores with other customers and
+should work well too.
+
+**Choose an x86 server.** netcup also rents ARM servers, and the Coop
+server cannot run on those.
+
 ## Quick start
 
 ```bash
@@ -79,7 +129,8 @@ sudo ./install.sh
 ```
 
 The installer walks through eight steps, asks for a campaign name, a server
-password and your Steam login, and downloads about 6 GB. When it finishes:
+password and your Steam login, downloads about 6 GB, and puts the Coop
+server's license terms to you before the first start. When it finishes:
 
 ```bash
 coop status
@@ -142,11 +193,15 @@ Both modes feed the same engine, so automation uses the same code path a
 person does:
 
 ```bash
-sudo coop install --default --non-interactive --yes \
+sudo coop install --default --non-interactive --yes --accept-eula \
      --save-name "Customer Campaign" \
      --server-password "s3cret" \
      --game-port 4210
 ```
+
+`--accept-eula` accepts the Coop server's license terms, which nobody can
+be asked about in an unattended run, so read them first. `--yes` never
+accepts a license.
 
 Steam Guard cannot be answered without a terminal, so authenticate once
 first. After that the session is reused and nothing prompts:
@@ -180,6 +235,11 @@ More in [docs/STEAM.md](docs/STEAM.md).
 | `coop save` | Force a save and wait for it |
 | `coop console <command>` | Send a command to the server console |
 | `coop logs [--follow]` | Show the server log |
+| `coop campaign list` | The campaigns on this server, and which one is hosted |
+| `coop campaign use <name>` | Host another campaign, with a backup first |
+| `coop campaign new <name>` | Start a new world, leaving the others alone |
+| `coop ban [<steam64-id>]` | List bans, or ban a Steam account |
+| `coop unban <steam64-id>` | Lift a ban |
 | `coop config` | Edit common settings |
 | `coop config --list` | Show every setting and its value |
 | `coop config --set KEY=VALUE` | Change one setting |
@@ -191,6 +251,7 @@ More in [docs/STEAM.md](docs/STEAM.md).
 | `coop backup restore [<id>]` | Restore saves and configuration |
 | `coop import-save <dir>` | Import campaign saves from a directory |
 | `coop steam status\|login\|logout` | Manage the Steam session |
+| `coop eula [show\|accept]` | The Coop server's license terms |
 | `coop doctor` | Check the installation and say what is wrong |
 | `coop version` | Manager and Coop versions, reported separately |
 
@@ -229,6 +290,8 @@ by default.
 |---|---|---|
 | `config/server.env` | Your settings. **Contains the server password.** | Yes |
 | `config/server-config.json` | Generated for the server. Do not edit. | Yes |
+| `config/steam-bans.json` | Banned Steam accounts. Edit with `coop ban`. | Yes |
+| `config/eula.txt` | Written by the server when its license terms are accepted | Yes |
 | `config/compose.env` | Generated for Docker Compose. Do not edit. | No |
 | `saves/` | Campaign saves (`.sav` with a matching `.json`) | Yes |
 | `coopdata/mod-config.json` | Gameplay settings, owned by the mod | Yes |
@@ -251,9 +314,10 @@ coop update             # install it
 coop rollback           # go back
 ```
 
-An update stops the server cleanly, backs up, keeps a copy of the current
-build, downloads, starts, and **rolls back by itself if the new build will
-not serve**.
+An update downloads while the server keeps running, settles any new
+license terms, then stops the server cleanly, backs up, keeps a copy of the
+current build, installs, brings the gameplay settings up to the new build,
+starts, and **rolls back by itself if the new build will not serve**.
 
 A scheduled check runs nightly and only reports. Automatic installation is
 off by default on purpose: the server verifies its Coop assemblies and every
@@ -262,6 +326,33 @@ anyone who has not updated their client. Turn it on with
 `coop config --set AUTO_UPDATE=true` if that trade suits your group.
 
 Details: [docs/UPDATES.md](docs/UPDATES.md).
+
+## Campaigns
+
+The server hosts one campaign at a time, and switching is one command:
+
+```bash
+coop campaign list
+sudo coop campaign use "Second Campaign"
+sudo coop campaign new "Fresh Start"
+```
+
+Both stop the server with a closing save, back up, switch and wait until
+the server serves again, and both put the previous campaign back if the
+new one will not serve. A name with no campaign behind it is refused, by
+these commands and by every other way of starting the server: the server
+would otherwise quietly create an empty world under the mistyped name.
+
+## Banning players
+
+```bash
+sudo coop ban 76561198000000042 --name "Troublemaker"
+coop ban
+sudo coop unban 76561198000000042
+```
+
+Bans take effect at the next join attempt, without a restart. The id is
+the number in the player's Steam profile address.
 
 ## Backups
 
@@ -329,28 +420,39 @@ The manager has its own version, separate from the Coop mod:
 
 ```
 $ coop version
-Bannerlord Coop Server Manager v0.1.0
-Installed Coop build:       build 2026-09-06 / Mount & Blade II: Bannerlord v1.4.8
+Bannerlord Coop Server Manager v0.2.0
+Installed Coop build:       build 2026-10-06 / Mount & Blade II: Bannerlord v1.4.8
 ```
 
 ## Status
 
-**v0.1.0, early but not untested.** Installed and exercised end to end on
-Ubuntu 26.04 and Debian 13:
+**v0.2.0.** Installed and exercised end to end on Ubuntu 26.04 and
+Debian 13:
 
 - install from nothing: dependency and Docker setup, Workshop download,
   world creation, first start
+- the update from Coop v0.1.5 to v0.1.6, a genuinely newer build: its new
+  license terms declined and accepted, the gameplay settings merge, and an
+  automatic rollback when the server would not start
+- rollback, and installing the same update again afterwards
 - clean shutdown through the server console, with the closing save
 - backup, listing, and restore of a deliberately destroyed campaign, with
   its pre-restore safety copy
-- update, and an automatic rollback from a build that would not start
+- switching between two campaigns and back, each time with a backup
 - save import, scheduled backups, and the diagnostics
 
-One thing has not been tested, and cannot be until it happens: an update to
-a genuinely **newer** Coop build. The machinery has run (version check,
-download, rollback copy, automatic rollback), but so far only against the
-same build. Watch the output the first time you run `coop update`.
+The ban list is written where the server reads it and survives updates.
+A refused join has not been observed yet, because that needs a second
+Steam account and a client.
 
 ## Licence
 
-MIT. See [LICENSE](LICENSE).
+The manager is MIT licensed. See [LICENSE](LICENSE).
+
+The Bannerlord Coop dedicated server it installs is not. It is proprietary
+software of Bannerlord Coop LLC, under the EULA and license that come with
+every build. The manager does not include or redistribute it: it downloads
+the official build from the Steam Workshop onto your own machine, and asks
+you to accept its terms. Running a paid or commercial service with it
+needs written permission from the Bannerlord Coop team
+(admin@bannerlordcoop.com).

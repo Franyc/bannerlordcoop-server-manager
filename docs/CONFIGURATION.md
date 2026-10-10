@@ -98,7 +98,7 @@ session lives under `state/steam`. See [STEAM.md](STEAM.md).
 | `MEMORY_LIMIT` | _(empty)_ | string | Yes | Memory limit for the container, e.g. 4g. Empty means no limit. Measured usage is 1.2-1.6 GB. |
 | `PGID` | `1000` | int | Yes | Group ID owning the data directories. |
 | `PUID` | `1000` | int | Yes | User ID owning the data directories and running the server process. |
-| `SAVE_NAME` | `Campaign` | string | Yes | Campaign save to host. An existing save of this name is loaded; otherwise a fresh world is created and saved under it. |
+| `SAVE_NAME` | `Campaign` | savename | Yes | Campaign save to host. Change it with 'coop campaign use'. A name with no save behind it starts a fresh world, which only happens when one was asked for: at installation, with 'coop campaign new', or with --new-world. |
 | `SERVER_LABEL` | `Bannerlord Coop Server` | string | No | Name used by the manager in status output and backup manifests. Not visible to joining players, because the game has no server name field. |
 | `SERVER_LOG_FILE` | `true` | bool | Yes | Write the server's output to a file per launch in logs/, in addition to the container log. |
 | `SERVER_PASSWORD` | _(empty)_ | string | Yes | Password players must enter to join. Empty means anyone who knows the address can join. |
@@ -122,9 +122,25 @@ step. Regenerate it with `tools/gen-config-docs.sh --write`.
 ### `SAVE_NAME`
 
 The campaign to host. If a save of that name exists in `saves/`, it is
-loaded. If not, the server creates a fresh world and saves it under that
-name. Changing it points the server at a different campaign. It does not
-rename anything.
+loaded. If not, the server would create a fresh world under that name, and
+the manager only lets that happen when a new world was asked for: at
+installation, with `coop campaign new`, or with `--new-world`.
+
+```bash
+sudo coop campaign use "My Campaign"         # switch, with a backup first
+sudo coop config --set SAVE_NAME="My Campaign"
+sudo coop config --set SAVE_NAME="Fresh Start" --new-world
+```
+
+The second form refuses a name with no campaign behind it; the third says
+that a new world is intended. A name differing only in case finds the
+campaign it matches. Changing `SAVE_NAME` points the server at a different
+campaign; it never renames or removes one.
+
+Names may contain spaces, up to 64 characters. They become file names for
+a Windows program, so `/ \ : * ? " < > |` are refused, as are names the
+server uses for itself (`default_new_game`, `coop_bug_report`,
+`TransferSave`, anything ending in `.backup1` or `.backup2`).
 
 ### `SERVER_LABEL`
 

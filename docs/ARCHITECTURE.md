@@ -116,10 +116,39 @@ debugging twice.
 | 2 | Load error or timeout |
 | 3 | Runtime failure |
 | 4 | Module verification failed: files under `Modules/Coop` were modified |
+| 6 | The build's license terms have not been accepted (Coop v0.1.6 and later) |
 
 Exit 4 is why `/server` is mounted **read-only**: the server checks its
 Coop assemblies with SHA-256 and refuses to start if they differ. What
 cannot be written cannot drift.
+
+## License terms are the operator's to accept
+
+From Coop v0.1.6 on, the server ships with an EULA and a license of its
+own, and exits 6 until they have been accepted. It records an acceptance
+itself, in `eula.txt` in its data directory, when it is started with
+`DS_ACCEPT_EULA=true`. The terms ask for a deliberate acceptance and
+forbid bypassing the check, so the manager does neither:
+
+- `compose.yaml` declares `DS_ACCEPT_EULA` **without a value**. Compose then
+  passes it only when it is set in the environment of `docker compose`
+  itself, and `coop` sets it only when starting a build whose terms the
+  operator accepted.
+- An acceptance is recorded in `state/install-state.json` against a SHA-256
+  of exactly the documents that were accepted, with who accepted and how.
+  A build whose documents differ by a byte is a build whose terms have not
+  been accepted, which is how "changed terms require fresh acceptance"
+  holds without anybody having to notice.
+- Acceptance takes "y" at a terminal or the explicit `--accept-eula` flag.
+  `--yes` confirms operations; it is not consent to a license, and it does
+  not count.
+- When the server refuses anyway, `server_start()` sees the refusal in
+  its output, stops Docker restarting it into the same refusal, and says
+  what to do.
+
+`coop update` downloads first and settles the new build's terms before it
+stops anything, so declining them, or an unattended run that cannot ask,
+leaves the server running the build it had.
 
 ## Waiting properly
 
@@ -154,8 +183,42 @@ C:\users\coop\Documents\Mount and Blade II Bannerlord\CoopData\mod-config.json
 ```
 
 Without its own bind mount it would be lost on every container rebuild.
-That is what the `coopdata/` mount is for, and why an update compares its
-checksum before and after.
+That is what the `coopdata/` mount is for.
+
+The mod creates the file once from the template its build ships and never
+replaces it, so a new build's settings would never reach it. An update
+therefore merges the new template with the file before the new build
+first starts. [UPDATES.md](UPDATES.md) has the details.
+
+## The ban list lives in config/
+
+From Coop v0.1.6 on, the server refuses the Steam accounts in
+`steam-bans.json`. Left to itself it looks in `server-data/` beside its
+engine directory, which is inside `server/`: mounted read-only, and
+replaced wholesale by every update and rollback. A ban kept there would
+vanish at the next update and be in no backup.
+
+`compose.yaml` therefore sets `COOP_STEAM_BAN_FILE=Z:\data\steam-bans.json`,
+which is `config/steam-bans.json` on the host. The variable is the one
+that moves only the ban list; `COOP_DATA_DIR` would also move
+`mod-config.json`.
+
+## A new world only on request
+
+The server hosts the save named by `SAVE_NAME`, and when there is none it
+quietly creates a fresh world under that name. On a first start that is
+right; after a typo it sends players into an empty world while the real
+campaign sits unused on disk.
+
+So a request for a new world is recorded (at installation, by
+`coop campaign new`, or by `--new-world`), and `server_start()` refuses to
+start into a save that does not exist without one. The check sits at the
+start rather than in the commands that change `SAVE_NAME`, because a hand
+edit of `server.env` or the interactive configuration changes it too.
+
+Names are compared without regard to case, as Wine does when the server
+opens the file. A check that told `campaign` from `Campaign` apart would
+refuse a start the server would have served from the right save.
 
 ## Configuration is data
 
@@ -255,7 +318,7 @@ saturated before the first player joins.
 
 | Port | Purpose |
 |---|---|
-| **UDP 4200** | Direct connect. The only port that must be reachable. |
+| **UDP 4200** | Direct connect. The only port that must be reachable. Proximity voice chat (Coop v0.1.6) travels over it too. |
 | UDP 27315/27316 | Steam game-server session, local only |
 
 Port 7210, which appears in some guides, belongs to the standard TaleWorlds

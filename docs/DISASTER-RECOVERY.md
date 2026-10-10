@@ -55,11 +55,14 @@ the backup. If you want to skip straight past them:
 
 ```bash
 sudo coop steam login
-sudo coop install --default --non-interactive --yes --save-name placeholder
+sudo coop install --default --non-interactive --yes --accept-eula --save-name placeholder
 ```
 
 This downloads about 6 GB from Steam and leaves you with a running server
-hosting an empty world.
+hosting an empty world. `--accept-eula` accepts the Coop server's license
+terms; leave it out to be asked instead. A new host has to accept them
+once, because the record of an acceptance is part of the installation, not
+of the backup.
 
 ## 3. Bring the backup across
 
@@ -106,8 +109,11 @@ coop status
 
 The campaign date is the proof. `Summer 1, 1084` is the date of a freshly
 created world: if you see exactly that, the server started a new game
-instead of loading yours. Check that `SAVE_NAME` matches a file in
-`saves/`.
+instead of loading yours. See which campaigns the server knows:
+
+```bash
+coop campaign list
+```
 
 ```bash
 coop doctor
@@ -148,13 +154,18 @@ sudo coop stop
 sudo cp -a saves/. /srv/bannerlordcoop/saves/
 sudo cp -a coopdata/. /srv/bannerlordcoop/coopdata/
 sudo chown -R "$(coop config --get PUID):$(coop config --get PGID)" /srv/bannerlordcoop/saves /srv/bannerlordcoop/coopdata
-sudo coop config --set SAVE_NAME="MyCampaign"
-sudo coop start
+sudo coop campaign use "MyCampaign"
 ```
 
 Do not copy the old `config/` wholesale onto a new installation. It
 contains paths and user IDs from the old host. Set the settings you care
-about with `coop config --set` instead.
+about with `coop config --set` instead. The one file in it worth carrying
+over is the ban list:
+
+```bash
+sudo cp config/steam-bans.json /srv/bannerlordcoop/config/
+sudo chown "$(coop config --get PUID):$(coop config --get PGID)" /srv/bannerlordcoop/config/steam-bans.json
+```
 
 For saves coming from a Windows machine, see
 [SAVE-MIGRATION.md](SAVE-MIGRATION.md).
@@ -170,8 +181,9 @@ now, while nothing is wrong.
 
 `server/`, `workshop/`, `rollback/` and the container image all come back
 from Steam and this repository. `logs/` is history, not state. `state/`
-holds installation metadata and the Steam session, both of which are
-recreated by an install and a login.
+holds installation metadata, the Steam session and the record of which
+license terms were accepted, all of which are recreated by an install, a
+login and an acceptance.
 
 Only `saves/`, `config/` and `coopdata/` are irreplaceable, which is
 exactly what a backup archive contains.
@@ -182,7 +194,7 @@ An untested backup is a hope. Once, on a spare machine or a cheap VPS by
 the hour:
 
 ```bash
-sudo ./install.sh --default --non-interactive --yes --save-name placeholder
+sudo ./install.sh --default --non-interactive --yes --accept-eula --save-name placeholder
 scp your-backup.tar.gz test-host:/srv/bannerlordcoop/backups/
 sudo coop backup restore <id>
 coop status

@@ -8,10 +8,11 @@ want this installation to host it.
 | File | Needed |
 |---|---|
 | `<name>.sav` | Yes. The world itself. |
-| `<name>.json` | Yes in practice. Metadata; without it the server may not list the save. |
+| `<name>.json` | Yes in practice. Every player's character and co-op progress. Without it the world loads, but returning players start again at character creation. |
 | `mod-config.json` | Optional. Gameplay settings such as difficulty and world ageing. |
 
-The `.sav` and `.json` are a pair. Copy both.
+The `.sav` and `.json` are a pair. Copy both. A save made in singleplayer
+has no `.json` yet; the server writes one at its first co-op save.
 
 ## From a Windows machine
 
@@ -66,7 +67,8 @@ sudo coop import-save /tmp/incoming
 The import:
 
 - checks that each `.sav` has a matching `.json` and warns where one is
-  missing
+  missing, and names the files the server keeps for itself, which are
+  not campaigns
 - shows you what it found and asks before doing anything
 - stops the server cleanly
 - **creates a backup first**
@@ -77,22 +79,27 @@ Import campaign saves
 
   Source: /tmp/incoming
 
-  + MyCampaign                   save and metadata present
-  ! OldRun                       no matching OldRun.json, so the server may not list it
+  + MyCampaign                   save and player data present
+  ! OldRun                       no OldRun.json: returning players start at character creation
 
   Existing saves in /srv/bannerlordcoop/saves will be overwritten where names match.
 
 Import these saves? [y/N]
 ```
 
-### 6. Point the server at the campaign
+### 6. Host the campaign
 
 The import does not guess which campaign you want to host:
 
 ```bash
-sudo coop config --set SAVE_NAME="MyCampaign"
-sudo coop start
+coop campaign list
+sudo coop campaign use "MyCampaign"
 ```
+
+`campaign use` stops the server with a closing save, makes a backup,
+switches, starts, and waits until the server serves. A name that does not
+match a campaign is refused, so a typo cannot send your players into a
+freshly created world.
 
 ### 7. Check that it is the right world
 
@@ -101,12 +108,11 @@ coop status
 ```
 
 `Campaign` must show your campaign's date, not `Summer 1, 1084`. That is
-the date of a freshly created world, so seeing it means the server started
-a new game instead of loading yours. If that happens, the name in
-`SAVE_NAME` does not match a file in `saves/`.
+the date of a freshly created world. If you see it, check which campaigns
+the server knows:
 
 ```bash
-ls /srv/bannerlordcoop/saves/
+coop campaign list
 ```
 
 ### 8. Gameplay settings
@@ -158,13 +164,13 @@ sudo coop config --set SERVER_PASSWORD="new-password"
 ## Moving a save between installations on one host
 
 ```bash
-sudo coop stop --instance second
-sudo cp /srv/bannerlordcoop/saves/MyCampaign.* /srv/bannerlordcoop-2/saves/
-sudo coop --instance second config --set SAVE_NAME="MyCampaign"
-sudo coop --instance second start
+sudo cp /srv/bannerlordcoop/saves/MyCampaign.sav /srv/bannerlordcoop/saves/MyCampaign.json /srv/bannerlordcoop-2/saves/
+sudo coop --install-dir /srv/bannerlordcoop-2 campaign use "MyCampaign"
 ```
 
-Fix ownership if the two installations use different service users.
+An installation is addressed by its directory. `--instance` alone only
+changes the names derived from the instance id, not which installation is
+read. Fix ownership if the two installations use different service users.
 
 ## If something goes wrong
 

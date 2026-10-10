@@ -122,6 +122,54 @@ sudo coop steam login
 
 ## The server will not start
 
+### Exit 6, "EULA acceptance required"
+
+**Cause.** From Coop v0.1.6 on, the server ships with license terms of its
+own and will not host a campaign until they have been accepted. Without
+that it prints the terms and exits 6, over and over, because Docker
+restarts it.
+
+**Check.**
+```bash
+coop eula
+```
+
+**Solution.** Read the terms, and accept them if you agree:
+
+```bash
+coop eula show
+sudo coop eula accept
+sudo coop start
+```
+
+The manager stops the restart loop itself as soon as it sees the refusal,
+and never accepts on your behalf. After a restore from a backup older than
+your acceptance, nothing needs doing: the acceptance is remembered by the
+manager and passed to the server again.
+
+### "Not starting: there is no campaign named ..."
+
+**Cause.** `SAVE_NAME` names a campaign that is not in `saves/`, usually a
+typo. Starting would make the server create a new, empty world under that
+name, so the manager refuses unless a new world was asked for.
+
+**Check.**
+```bash
+coop campaign list
+```
+
+**Solution.** Host the campaign you meant:
+
+```bash
+sudo coop campaign use "<name>"
+```
+
+or, if a new world really is what you want:
+
+```bash
+sudo coop campaign new "<name>"
+```
+
 ### It stops immediately, exit 4
 
 **Cause.** The Coop assemblies do not match the release. The server
@@ -149,8 +197,9 @@ something wrote to it from outside the container.
 
 ### Exit 2, the save will not load
 
-**Cause.** A damaged or incomplete save, a missing `.json` beside the
-`.sav`, or a save written by a different Coop build.
+**Cause.** A damaged or incomplete save, or a save written by a different
+Coop build. A missing `.json` is not the cause: without it the world still
+loads, and only returning players have to create their character again.
 
 **Check.**
 ```bash
@@ -253,6 +302,31 @@ coop version
 
 **Solution.** Everyone must run the same build. This is also why automatic
 updates are off by default. See [UPDATES.md](UPDATES.md).
+
+### A banned player can still join
+
+**Cause.** The ban list is new in Coop v0.1.6, and it is only read from
+where the manager points the server: `config/steam-bans.json`.
+
+**Check.**
+```bash
+coop ban
+coop doctor
+coop version
+```
+
+`coop doctor` fails the `Steam bans` line when the file is not valid JSON.
+The server then keeps using the last list it could read.
+
+**Solution.** Ban by Steam64 id, the number in the player's profile
+address, `steamcommunity.com/profiles/<id>`:
+
+```bash
+sudo coop ban 76561198000000042 --name "Troublemaker"
+```
+
+No restart is needed. The server reads the list again at the next join
+attempt and logs `Steam ban list loaded from Z:\data\steam-bans.json`.
 
 ---
 
@@ -366,6 +440,21 @@ coop logs | tail -80
 running. Report the failure to the Coop project, and wait for the next
 release. `coop update` will offer it again.
 
+### "The update was not installed"
+
+**Cause.** The new build comes with license terms that have not been
+accepted. Exit code 80.
+
+**Solution.** Nothing was changed; the server is still running the
+previous build. Read the terms in the files the message lists, then:
+
+```bash
+sudo coop update
+```
+
+on a terminal, which asks, or `sudo coop update --accept-eula` without
+one. `--yes` does not accept a license.
+
 ### "Could not determine whether an update exists"
 
 **Cause.** The Steam Web API was unreachable. Exit code 30.
@@ -395,8 +484,14 @@ ls -ln /srv/bannerlordcoop/
 
 **Solution.**
 ```bash
-sudo chown -R "$(coop config --get PUID):$(coop config --get PGID)" /srv/bannerlordcoop
+cd /srv/bannerlordcoop
+sudo chown -R "$(coop config --get PUID):$(coop config --get PGID)" saves config coopdata logs server
 ```
+
+Leave `state/steam` alone. SteamCMD runs as root, and handing that
+directory to the service user makes the next download fail with
+`Couldn't create cache directory`, which looks exactly like an expired
+session.
 
 `coop backup restore` sets ownership itself, which is why a backup from a
 machine with different user IDs restores cleanly.

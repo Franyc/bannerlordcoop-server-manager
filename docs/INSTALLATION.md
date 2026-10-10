@@ -27,8 +27,8 @@ half-working. Many inexpensive VPS offers are arm64, so check before you buy.
 
 | Distribution | Status | Tested |
 |---|---|---|
-| Ubuntu 26.04 LTS | Supported | **yes**: full install, update, rollback, backup, restore |
-| Debian 13 | Supported | **yes**: full install on a German-locale host |
+| Ubuntu 26.04 LTS | Supported | **yes**: full install, update to a newer Coop build, rollback, backup, restore, campaign switching |
+| Debian 13 | Supported | **yes**: full install, update to a newer Coop build, rollback, campaign switching, on a German-locale host |
 | Ubuntu 22.04 / 24.04 LTS | Supported | no, same package sources as 26.04 |
 | Debian 12 | Supported | no, same package sources as 13 |
 | Ubuntu 20.04+, other releases | Experimental | no |
@@ -114,7 +114,7 @@ can do too, so there is one implementation rather than two.
 | 5 | Dependencies: Docker, tools, service user |
 | 6 | Steam authentication |
 | 7 | Directories, configuration, image build, download |
-| 8 | First start and validation |
+| 8 | The Coop server's license terms, first start and validation |
 
 The confirmation at step 4 comes before Steam rather than after it, which
 is a deliberate departure from the obvious order. Authenticating with
@@ -168,6 +168,32 @@ and automatic updates.
 Both modes feed the same engine. Advanced asks more questions; it does not
 take a different code path.
 
+## License terms
+
+From Coop v0.1.6 on, the dedicated server comes with license terms of its
+own, `EULA.md` and `LICENSE.txt`, and will not host a campaign until they
+have been accepted. They arrive with the server files, so step 8 is the
+first point at which there is anything to read:
+
+```
+License terms
+
+  This Coop server build comes with license terms of its own. The
+  server will not host a campaign until they have been accepted:
+
+    /srv/bannerlordcoop/server/EULA.md
+    /srv/bannerlordcoop/server/LICENSE.txt
+
+Read them now? [Y/n]
+Do you accept these license terms? [y/N]
+```
+
+They are the Bannerlord Coop team's terms, not this installer's, and the
+installer never accepts them for you. Among other things they govern
+commercial hosting, which needs the team's written permission. If you
+decline, the installation is complete but the server is not started; run
+`coop eula accept` and `coop start` when you have decided.
+
 ## Steam authentication
 
 See [STEAM.md](STEAM.md) for the detail. In short: the Workshop download
@@ -182,11 +208,18 @@ sudo coop steam login
 ```
 
 ```bash
-sudo coop install --default --non-interactive --yes --save-name "Customer Campaign" --server-password "s3cret" --game-port 4210 --backup-keep-auto 24
+sudo coop install --default --non-interactive --yes --accept-eula --save-name "Customer Campaign" --server-password "s3cret" --game-port 4210 --backup-keep-auto 24
 ```
 
 Steam Guard cannot be answered without a terminal, so authenticate once
 first. After that nothing prompts.
+
+`--accept-eula` accepts the Coop server's license terms, which nobody can
+be asked about in an unattended run. Read them before you pass it:
+`EULA.md` and `LICENSE.txt` in the server files, or `coop eula show` on any
+installation of the same build. Without the flag the installation
+completes, the server is not started, and the command exits 80. `--yes`
+does not accept a license.
 
 `--yes` is required, not decorative. Installing a server onto a host is a
 consequential act, and `--non-interactive` promises never to answer a
@@ -224,7 +257,10 @@ application installer should do behind your back.
 ## First start
 
 The first start creates a new world if no save of the configured name
-exists. Loading takes about two minutes on a grown campaign; the installer
+exists. Installation is the one moment where that happens without being
+asked for separately; afterwards a name with no save behind it is refused,
+so a typo cannot quietly start an empty world. See `coop campaign` in
+[CLI.md](CLI.md). Loading takes about two minutes on a grown campaign; the installer
 waits for the server to report that it is actually serving clients, not
 just that the container is up.
 
