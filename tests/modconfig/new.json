@@ -1,14 +1,17 @@
 {
-  // What a newer Coop build writes: its own defaults, its own comments,
-  // one setting added and one removed.
+  // What a newer Coop build ships: its own defaults, its own comments,
+  // one setting added, one removed, and two defaults changed.
   "difficulty": {
     // Damage players take.
     "playerReceivedDamage": "VeryEasy",
+    // The default changed in this build.
+    "birthAndDeath": true,
   },
   "modOptions": {
     // NEW IN THIS BUILD - the player has never seen this one.
     "addedInNewBuild": "Balanced",
     "battleSize": 1000,
     "enableHeroExecutions": true,
+    "playerBattleAiJoinWindowHours": 6,
   },
 }

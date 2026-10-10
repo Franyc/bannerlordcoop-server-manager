@@ -63,16 +63,25 @@ backup_sidecar() { printf '%s.json' "${1%.tar.gz}"; }
 # time runs fast enough that any real session changes it. A checksum is
 # still used when the server is not running, where there is no campaign
 # date to read and the file genuinely does sit still.
+#
+# The campaign's name is part of the comparison. Two worlds can stand at
+# the same date - two fresh ones always do - and a switch to the other one
+# must not look like "nothing has happened".
+_auto_backup_marker() {
+    local date; date="$(pulse_time)"
+    [[ -n "$date" ]] && printf '%s|%s' "$(cfg SAVE_NAME)" "$date"
+}
+
 _auto_backup_redundant() {
     [[ "$1" == "auto" ]] || return 1
     [[ "$(player_count)" == "0" ]] || return 1
 
-    local now_date last_date
-    now_date="$(pulse_time)"
+    local now_marker last_marker
+    now_marker="$(_auto_backup_marker)"
 
-    if [[ -n "$now_date" ]]; then
-        last_date="$(cat "$DIR_STATE/.last-auto-campaign" 2>/dev/null || true)"
-        [[ -n "$last_date" && "$now_date" == "$last_date" ]]
+    if [[ -n "$now_marker" ]]; then
+        last_marker="$(cat "$DIR_STATE/.last-auto-campaign" 2>/dev/null || true)"
+        [[ -n "$last_marker" && "$now_marker" == "$last_marker" ]]
         return $?
     fi
 
@@ -140,8 +149,8 @@ backup_create() {
 
     # Remember what "nothing has happened since" means for the next run.
     if [[ "$type" == "auto" ]]; then
-        local campaign; campaign="$(pulse_time)"
-        [[ -n "$campaign" ]] && printf '%s\n' "$campaign" >"$DIR_STATE/.last-auto-campaign"
+        local marker; marker="$(_auto_backup_marker)"
+        [[ -n "$marker" ]] && printf '%s\n' "$marker" >"$DIR_STATE/.last-auto-campaign"
         [[ -f "$DIR_SAVES/$(cfg SAVE_NAME).sav" ]] && \
             md5sum "$DIR_SAVES/$(cfg SAVE_NAME).sav" | cut -d' ' -f1 >"$DIR_STATE/.last-auto-hash"
     fi
@@ -570,10 +579,12 @@ backup_import_save() {
         local base json
         base="$(basename "$save_file" .sav)"
         json="$src/${base}.json"
-        if [[ -f "$json" ]]; then
-            out_check ok "$(printf '%-28s %s' "$base" "save and metadata present")"
+        if _campaign_reserved "$base"; then
+            out_check info "$(printf '%-28s %s' "$base" "kept by the server for its own use, not a campaign")"
+        elif [[ -f "$json" ]]; then
+            out_check ok "$(printf '%-28s %s' "$base" "save and player data present")"
         else
-            out_check warn "$(printf '%-28s %s' "$base" "no matching ${base}.json, so the server may not list it")"
+            out_check warn "$(printf '%-28s %s' "$base" "no ${base}.json: returning players start at character creation")"
         fi
     done < <(find "$src" -maxdepth 1 -name '*.sav' -type f | sort)
     out_line ""
@@ -591,8 +602,7 @@ backup_import_save() {
     ok "Saves imported"
 
     out_line ""
-    out_line "  Set the campaign to host, then start the server:"
-    out_line "    coop config --set SAVE_NAME=\"<name>\""
-    out_line "    coop start"
+    out_line "  Host the imported campaign, which also starts the server:"
+    out_line "    coop campaign use \"<name>\""
     out_line ""
 }

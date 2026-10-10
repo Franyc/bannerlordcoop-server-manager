@@ -25,7 +25,8 @@ declare -gA CFG_OVERRIDE=() # values from the command line, applied last
 # ------------------------------------------------------------------- spec --
 # One row per setting: TYPE|RESTART|DESCRIPTION
 #
-#   TYPE      identifier | path | string | int | port | bool | enum:a|b | schedule
+#   TYPE      identifier | path | string | savename | int | port | bool |
+#             enum:a|b | schedule
 #   RESTART   yes  - the server must be restarted for a change to take effect
 #             no   - picked up on the next operation
 #             install - only meaningful at install time
@@ -45,7 +46,7 @@ declare -gA CONFIG_SPEC=(
 
     [STEAM_USERNAME]="string|no|Steam account used to download the Workshop item. The password is never stored, only Steam's own session under state/steam."
 
-    [SAVE_NAME]="string|yes|Campaign save to host. An existing save of this name is loaded; otherwise a fresh world is created and saved under it."
+    [SAVE_NAME]="savename|yes|Campaign save to host. Change it with 'coop campaign use'. A name with no save behind it starts a fresh world, which only happens when one was asked for: at installation, with 'coop campaign new', or with --new-world."
     [SERVER_PASSWORD]="string|yes|Password players must enter to join. Empty means anyone who knows the address can join."
     [GAME_PORT]="port|yes|UDP port players connect to. This is the only port that has to be reachable from the internet."
     [AUTOSAVE_MINUTES]="int|yes|Minutes between automatic world saves. 0 disables autosaving."
@@ -76,7 +77,10 @@ declare -gA CONFIG_SPEC=(
     [LOG_MAX_FILES]="int|no|Number of rotated container log files to keep."
 )
 
-config_keys() { printf '%s\n' "${!CONFIG_SPEC[@]}" | sort; }
+# Byte order, whatever the locale: a German one sorts STEAM_ADVERTISE before
+# STEAMCMD_IMAGE, and the generated settings table then no longer matched
+# the one in the documentation.
+config_keys() { printf '%s\n' "${!CONFIG_SPEC[@]}" | LC_ALL=C sort; }
 
 # TYPE|RESTART|DESCRIPTION. Enum alternatives are comma-separated, so the
 # type field never contains the field separator and the description may
@@ -136,6 +140,24 @@ _validate_value() {
             ;;
         string)
             (( ${#value} <= 512 )) || printf 'must be at most 512 characters'
+            ;;
+        savename)
+            # Becomes a file name for a Windows program: <name>.sav and
+            # <name>.json in "Game Saves". Spaces are fine and common.
+            local bad='[/\\:*?"<>|]'
+            if [[ -z "$value" ]]; then
+                printf 'must not be empty'
+            elif (( ${#value} > 64 )); then
+                printf 'must be at most 64 characters'
+            elif [[ "$value" =~ $bad ]]; then
+                printf 'must not contain any of / \\ : * ? " < > |'
+            elif [[ "$value" == [[:space:]]* || "$value" == *[[:space:]] || "$value" == *. ]]; then
+                printf 'must not begin or end with a space, or end with a dot'
+            elif [[ "${value,,}" =~ ^(con|prn|aux|nul|com[1-9]|lpt[1-9])$ ]]; then
+                printf 'is a device name Windows reserves'
+            elif [[ "${value,,}" =~ ^(default_new_game|coop_bug_report|transfersave)$|\.backup[12]$ ]]; then
+                printf 'is a name the server uses for its own files'
+            fi
             ;;
     esac
     # A reason is reported by printing it, never by the exit status. Some
@@ -298,6 +320,7 @@ config_derive_paths() {
     FILE_CONFIG="$DIR_CONFIG/server.env"
     FILE_SERVER_JSON="$DIR_CONFIG/server-config.json"
     FILE_MOD_JSON="$DIR_COOPDATA/mod-config.json"
+    FILE_BANS="$DIR_CONFIG/steam-bans.json"
     FILE_STATE="$DIR_STATE/install-state.json"
     FILE_COMPOSE_ENV="$DIR_CONFIG/compose.env"
     CONTAINER_NAME="bannerlordcoop-${INSTANCE_ID}"

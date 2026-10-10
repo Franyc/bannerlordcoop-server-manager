@@ -22,13 +22,31 @@ _fmt_ts() {
         && date -d "@$1" '+%Y-%m-%d %H:%M' || printf 'unknown'
 }
 
+# The Workshop timestamp of the build that is INSTALLED, as recorded when
+# the manager put it in place.
+#
+# Steam's own manifest cannot answer this. It describes the last download,
+# and the download and the installed build part ways twice: after a
+# rollback, and when an update was fetched but not installed. Reading the
+# manifest there reported "up to date" over a server still running the
+# previous build, and `coop update` then declined to install the very
+# update it had just downloaded.
+installed_workshop_time() {
+    local t; t="$(state_get workshop_version)"
+    if [[ "$t" =~ ^[0-9]+$ ]] && (( t > 0 )); then
+        printf '%s' "$t"
+        return 0
+    fi
+    workshop_local_time
+}
+
 # update_available
 #   0  a newer version exists
 #   1  up to date
 #   2  cannot tell (Steam unreachable)
 update_available() {
     local local_ts remote_ts
-    local_ts="$(workshop_local_time)"
+    local_ts="$(installed_workshop_time)"
     remote_ts="$(workshop_remote_time || true)"
 
     [[ -n "$remote_ts" ]] || return 2
@@ -55,7 +73,7 @@ update_check() {
 
     local rc=0 local_ts remote_ts
     update_available || rc=$?
-    local_ts="$(workshop_local_time)"
+    local_ts="$(installed_workshop_time)"
     remote_ts="$(workshop_remote_time || true)"
 
     if (( rc == 2 )); then
@@ -108,6 +126,8 @@ update_scheduled() {
 
     if update_marker_is_set && cfg_bool AUTO_UPDATE; then
         log "AUTO_UPDATE is enabled. Installing the update now."
+        # A build with license terms nobody has accepted stops here, before
+        # the server is touched: an unattended run never accepts terms.
         update_apply
         return $?
     fi
@@ -176,6 +196,22 @@ _rollback_version() {
 }
 
 # ------------------------------------------------------------------ update --
+# THE ORDER IS THE POINT
+# ----------------------
+#   1. download          the server keeps running
+#   2. license terms     the server keeps running
+#   3. stop, with a closing save
+#   4. pre-update backup
+#   5. keep the current build in rollback/
+#   6. put the new build in place
+#   7. carry the gameplay settings across
+#   8. start, and roll back by itself if the new build will not serve
+#
+# Everything that can fail or be declined without consequences happens
+# while the current build is still serving. A failed download, or terms
+# the operator does not accept, leave the server exactly as it was. It
+# used to stop first, and a download failure then left the server down.
+#
 # shellcheck disable=SC2120  # called with --force from bin/coop
 update_apply() {
     local force=0 arg
@@ -202,43 +238,58 @@ update_apply() {
 
     out_title "Workshop update"
 
-    # 1. stop cleanly - this writes a closing save
+    # 1. fetch. The download lands in workshop/, which the running server
+    #    never reads.
+    source_fetch
+    local staging; staging="$(source_staging_dir)"
+    [[ -f "$staging/BannerlordCoopServer.exe" ]] || fail "$EX_RUNTIME" \
+        "The downloaded files are not where they were expected: $staging" \
+        "Nothing was changed; the server keeps running the current build."
+    log "Downloaded: $(server_version_of "$staging")"
+
+    # 2. the new build's license terms, settled before anything stops
+    if ! license_require "$staging"; then
+        warn "The update was not installed. Nothing was changed; the server keeps running the current build."
+        return "$EX_LICENSE"
+    fi
+
+    # 3. stop cleanly - this writes a closing save
     server_stop
 
-    # 2. campaign, configuration and gameplay settings first
+    # 4. campaign, configuration and gameplay settings first
     log "Creating a pre-update backup"
     backup_create pre-update "before Workshop update" >/dev/null
 
-    # 3. keep the working build so a failure has somewhere to go back to.
+    # 5. keep the working build so a failure has somewhere to go back to.
     #    A directory copy costs disk but turns a rollback into a rename
     #    instead of a 6 GB download.
     log "Copying the current build to rollback/"
     mkdir -p "$DIR_ROLLBACK"
-    rsync -a --delete "$DIR_SERVER/" "$DIR_ROLLBACK/" \
-        || fail "$EX_RUNTIME" "Could not create the rollback copy; stopping before anything changed."
-    cp -a "$FILE_MOD_JSON" "$DIR_ROLLBACK/mod-config.json.bak" 2>/dev/null || true
-    workshop_local_time >"$DIR_ROLLBACK/.timeupdated"
-
-    local modcfg_before
-    modcfg_before="$(md5sum "$FILE_MOD_JSON" 2>/dev/null | cut -d' ' -f1 || true)"
-
-    # 4. fetch
-    if ! source_fetch; then
-        warn "Download failed. Restarting the current version."
-        server_start || fail "$EX_RUNTIME" "The current version did not restart. Check: coop logs"
-        return "$EX_STEAM"
+    if ! rsync -a --delete "$DIR_SERVER/" "$DIR_ROLLBACK/"; then
+        warn "Could not create the rollback copy. Restarting the current build unchanged."
+        server_start
+        fail "$EX_RUNTIME" "The update was not installed: no rollback copy could be made." \
+            "Check the free space in $INSTALL_DIR."
     fi
+    cp -a "$FILE_MOD_JSON" "$DIR_ROLLBACK/mod-config.json.bak" 2>/dev/null || true
+    installed_workshop_time >"$DIR_ROLLBACK/.timeupdated"
 
-    # 5. put the new files in place
-    local staging; staging="$(source_staging_dir)"
-    [[ -d "$staging" ]] || fail "$EX_RUNTIME" "The downloaded files are not where they were expected: $staging"
+    # 6. put the new files in place
     log "Synchronising the new build into server/"
-    rsync -a --delete "$staging/" "$DIR_SERVER/" \
-        || fail "$EX_RUNTIME" "Could not synchronise the new build."
+    if ! rsync -a --delete "$staging/" "$DIR_SERVER/"; then
+        warn "Could not synchronise the new build."
+        rollback_apply --auto
+        fail "$EX_RUNTIME" \
+            "The update failed and was rolled back automatically." \
+            "The server is running the previous build again."
+    fi
     chown -R "$(cfg PUID):$(cfg PGID)" "$DIR_SERVER" 2>/dev/null || true
     log "New build: $(server_version)"
 
-    # 6. start - and if it will not serve, go back on its own
+    # 7. before the first start, so the server boots on the merged file
+    _update_merge_mod_config
+
+    # 8. start - and if it will not serve, go back on its own
     if ! server_start; then
         warn "The server did not come up with the new build."
         rollback_apply --auto
@@ -247,9 +298,6 @@ update_apply() {
             "The server is running the previous build again." \
             "Logs: coop logs"
     fi
-
-    # 7. the mod may rewrite its own gameplay config on a new build
-    _update_guard_mod_config "$modcfg_before"
 
     state_set installed_version "$(server_version)"
     state_set workshop_version "$(workshop_local_time)"
@@ -262,32 +310,66 @@ update_apply() {
     out_line ""
 }
 
-# modconfig_merge <previous> <new> <output> <report>
-#
-# WHY A MERGE AND NOT A RESTORE
+# ----------------------------------------------------- gameplay settings --
+# WHY THE MANAGER MERGES AT ALL
 # -----------------------------
 # mod-config.json holds the gameplay settings - difficulty, world ageing,
-# battle size - and belongs to the Coop mod, which rewrites it with that
-# build's defaults. Neither simple answer is right:
+# battle size - and belongs to the Coop mod. The mod creates it from the
+# template it ships, mod-config.default.json, and after that never
+# replaces it. A new build's settings therefore never reach an existing
+# file: they run at their defaults, invisible and undocumented, and the
+# operator has no way of knowing they exist.
 #
-#   keep the new file   -> every setting the player chose is silently reset
-#   put the old file back -> settings the new build introduced are missing,
-#                            and the mod re-adds them on the next boot, so
-#                            the same fight happens again every launch
+# So before the new build first starts, its template is merged with the
+# file the operator has. The TEMPLATE is the base, because it brings the
+# new settings and the comments that document them. Every value from the
+# operator's file is transplanted into it. Settings the build dropped are
+# gone, because they no longer do anything.
 #
-# So the NEW file is the template. It brings the new keys and the comments
-# that document them. Every value that existed before is transplanted into
-# it; keys that are new keep their default; keys that no longer exist are
-# dropped, because the setting is gone.
+# Defaults the new build changed are reported, not applied. A value equal
+# to the old default may still be a choice, and changing difficulty or the
+# economy in the middle of a running campaign is the operator's decision.
 #
 # The file is JSONC, which jq cannot read - but it is strictly one setting
 # per line, which makes a line-oriented merge both possible and safe, and
-# leaves every comment untouched.
+# leaves every comment untouched. Its line endings are CRLF, and a line
+# that gets a new value keeps them.
+
+# modconfig_template <build-dir> - the template a build ships, if any.
+# Searched rather than assumed: the module's folder name has changed
+# between builds before.
+modconfig_template() {
+    find "$1/engine/Modules" -mindepth 2 -maxdepth 2 -name mod-config.default.json \
+        -type f 2>/dev/null | sort | head -1
+}
+
+# modconfig_values <file> - "key<TAB>value" for every setting in the file.
+modconfig_values() {
+    awk '
+    /^[[:space:]]*"[A-Za-z0-9_]+"[[:space:]]*:/ {
+        line = $0
+        sub(/\r$/, "", line)
+        p = index(line, "\"")
+        rest = substr(line, p + 1)
+        k = substr(rest, 1, index(rest, "\"") - 1)
+        v = substr(line, index(line, ":") + 1)
+        sub(/^[[:space:]]+/, "", v); sub(/[[:space:]]+$/, "", v); sub(/,$/, "", v)
+        if (v != "{" && v != "") print k "\t" v
+    }' "$1"
+}
+
+_modconfig_count() {
+    grep -cE '^[[:space:]]*"[A-Za-z0-9_]+"[[:space:]]*:' "$1" 2>/dev/null || true
+}
+
+# modconfig_merge <previous> <new> <output> <report>
 #
-# The report file receives one "added <key>" or "removed <key>" line per
-# difference, so the caller can tell the user what actually changed.
+# <new> is the base; every value <previous> has is written into it. The
+# report receives one "added <key>" or "removed <key>" line per difference,
+# so the caller can say what actually changed.
 modconfig_merge() {
     local previous="$1" new="$2" output="$3" report="$4"
+    : >"$report"
 
     awk '
     function keyof(line,   p, q) {
@@ -308,7 +390,7 @@ modconfig_merge() {
         return substr(line, 1, RLENGTH)
     }
 
-    # First pass: remember what the player had.
+    # First pass: remember what the operator had.
     NR == FNR {
         if ($0 ~ /^[[:space:]]*"[A-Za-z0-9_]+"[[:space:]]*:/) {
             k = keyof($0); v = valof($0); sub(/,$/, "", v)
@@ -323,11 +405,12 @@ modconfig_merge() {
         if ($0 ~ /^[[:space:]]*"[A-Za-z0-9_]+"[[:space:]]*:/) {
             k = keyof($0); v = valof($0)
             comma = (v ~ /,$/) ? "," : ""
+            cr = ($0 ~ /\r$/) ? "\r" : ""
             sub(/,$/, "", v)
             if (v != "{") {
                 if (k in kept) {
                     seen[k] = 1
-                    print indentof($0) "\"" k "\": " kept[k] comma
+                    print indentof($0) "\"" k "\": " kept[k] comma cr
                     next
                 }
                 print "added " k > REPORT
@@ -342,62 +425,101 @@ modconfig_merge() {
     ' REPORT="$report" "$previous" "$new" >"$output"
 }
 
-# Called after the server has booted on the new build, because that is when
-# the mod rewrites its configuration.
-_update_guard_mod_config() {
-    local before="$1" after saved="$DIR_ROLLBACK/mod-config.json.bak"
-    after="$(md5sum "$FILE_MOD_JSON" 2>/dev/null | cut -d' ' -f1 || true)"
+# modconfig_changed_defaults <old-template> <new-template> <current>
+#
+# "key<TAB>old<TAB>new" for every setting whose default changed between the
+# two builds while <current> still holds the old default: the settings an
+# operator most likely never chose, and might want to follow.
+modconfig_changed_defaults() {
+    local old_t new_t cur
+    old_t="$(mktemp)"; new_t="$(mktemp)"; cur="$(mktemp)"
+    modconfig_values "$1" >"$old_t"
+    modconfig_values "$2" >"$new_t"
+    modconfig_values "$3" >"$cur"
+    awk -F'\t' '
+        FILENAME == OLD { old[$1] = $2; next }
+        FILENAME == NEW { new[$1] = $2; next }
+        { cur[$1] = $2 }
+        END {
+            for (k in cur)
+                if ((k in old) && (k in new) && old[k] != new[k] && cur[k] == old[k])
+                    print k "\t" old[k] "\t" new[k]
+        }
+    ' OLD="$old_t" NEW="$new_t" "$old_t" "$new_t" "$cur" | sort
+    rm -f "$old_t" "$new_t" "$cur"
+}
 
-    if [[ -z "$before" || "$before" == "$after" ]]; then
-        debug "gameplay configuration unchanged"
+# Prints a list as wrapped, indented lines.
+_wrap_list() {
+    local indent="$1"; shift
+    printf '%s\n' "$*" | sed 's/ /, /g' | fold -s -w $(( 76 - ${#indent} )) | sed "s/^/${indent}/"
+}
+
+_update_merge_mod_config() {
+    local new_tmpl old_tmpl
+    new_tmpl="$(modconfig_template "$DIR_SERVER")"
+    old_tmpl="$(modconfig_template "$DIR_ROLLBACK")"
+
+    # Nothing to merge into yet: the mod creates the file on first start.
+    [[ -f "$FILE_MOD_JSON" && -n "$new_tmpl" ]] || return 0
+    if [[ -n "$old_tmpl" ]] && cmp -s "$old_tmpl" "$new_tmpl"; then
+        debug "the gameplay settings template is unchanged"
         return 0
     fi
-    if [[ ! -f "$saved" ]]; then
-        warn "The gameplay configuration changed, but there is no previous copy to merge from."
-        return 0
-    fi
-
-    log "The new build rewrote the gameplay configuration; merging your settings back in"
-    cp -a "$FILE_MOD_JSON" "${FILE_MOD_JSON}.new-from-update"
 
     local merged report
-    merged="${FILE_MOD_JSON}.merged.$$"
-    report="${FILE_MOD_JSON}.report.$$"
+    merged="$(mktemp "${FILE_MOD_JSON}.merge.XXXXXX")"
+    report="$(mktemp "${FILE_MOD_JSON}.report.XXXXXX")"
     cleanup_register "$merged"; cleanup_register "$report"
 
-    modconfig_merge "$saved" "$FILE_MOD_JSON" "$merged" "$report"
+    modconfig_merge "$FILE_MOD_JSON" "$new_tmpl" "$merged" "$report"
 
-    # A merge that lost settings is worse than no merge at all, so the
-    # result has to account for every line the new file had.
-    local new_count merged_count
-    new_count="$(grep -cE '^[[:space:]]*"[A-Za-z0-9_]+"[[:space:]]*:' "$FILE_MOD_JSON" || echo 0)"
-    merged_count="$(grep -cE '^[[:space:]]*"[A-Za-z0-9_]+"[[:space:]]*:' "$merged" || echo 0)"
-    if (( merged_count != new_count )) || (( merged_count == 0 )); then
-        warn "The gameplay configuration could not be merged safely; the new build's defaults are in place."
-        out_line "    Your previous settings: ${saved}"
-        out_line "    Compare them with: diff ${saved} ${FILE_MOD_JSON}"
+    # A merge that lost settings would be worse than none. The file the
+    # operator has keeps working as it is: the mod runs anything it does
+    # not mention at the default.
+    local want got
+    want="$(_modconfig_count "$new_tmpl")"
+    got="$(_modconfig_count "$merged")"
+    if [[ "$got" != "$want" || "$got" == "0" ]]; then
+        warn "The new build's gameplay settings could not be merged safely; mod-config.json was left as it is."
+        out_line "    Settings it does not mention run at their defaults. Compare:"
+        out_line "      diff $FILE_MOD_JSON $new_tmpl"
         return 0
     fi
 
-    cp -a "$merged" "$FILE_MOD_JSON"
-    chown "$(cfg PUID):$(cfg PGID)" "$FILE_MOD_JSON" 2>/dev/null || true
-    ok "Gameplay settings carried over"
-
-    local line
+    local added=() removed=() what key
     while IFS=' ' read -r what key; do
-        [[ -n "${key:-}" ]] || continue
         case "$what" in
-            added)   out_line "    new setting, left at the new default: $key" ;;
-            removed) out_line "    setting no longer exists in this build: $key" ;;
+            added)   added+=("$key") ;;
+            removed) removed+=("$key") ;;
         esac
     done <"$report"
 
-    out_line "    The build's own version is kept beside it:"
-    out_line "      diff ${FILE_MOD_JSON} ${FILE_MOD_JSON}.new-from-update"
+    if ! cmp -s "$merged" "$FILE_MOD_JSON"; then
+        chmod 0644 "$merged"
+        chown "$(cfg PUID):$(cfg PGID)" "$merged" 2>/dev/null || true
+        mv -f "$merged" "$FILE_MOD_JSON"
+    fi
 
-    # The merged values only take effect on the next boot.
-    server_stop
-    server_start || fail "$EX_HEALTH" \
-        "Restart after merging the gameplay configuration failed." \
-        "Logs: coop logs"
+    ok "Gameplay settings brought up to this build; your values were kept"
+    if (( ${#added[@]} )); then
+        out_line "    New in this build, at their defaults:"
+        _wrap_list "      " "${added[@]}"
+    fi
+    if (( ${#removed[@]} )); then
+        out_line "    No longer in this build, removed:"
+        _wrap_list "      " "${removed[@]}"
+    fi
+
+    [[ -n "$old_tmpl" ]] || return 0
+    local changed old new
+    changed="$(modconfig_changed_defaults "$old_tmpl" "$new_tmpl" "$FILE_MOD_JSON")"
+    if [[ -n "$changed" ]]; then
+        out_line "    Defaults this build changed. Your file keeps the value it had:"
+        while IFS=$'\t' read -r key old new; do
+            out_line "$(printf '      %-40s %s, now %s' "$key" "$old" "$new")"
+        done <<<"$changed"
+        out_line "    To follow a new default, edit $FILE_MOD_JSON"
+        out_line "    and run: coop restart"
+    fi
 }

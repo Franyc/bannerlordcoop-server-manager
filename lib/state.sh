@@ -45,14 +45,28 @@ state_get() {
 # string.
 state_set() {
     local key="$1" value="$2" raw="${3:-}"
+    if [[ "$raw" == "--raw" ]]; then
+        state_apply '.[$k] = $v' --arg k "$key" --argjson v "$value"
+    else
+        state_apply '.[$k] = $v' --arg k "$key" --arg v "$value"
+    fi
+}
+
+# state_apply <jq-filter> [jq-args...]
+#
+# For the facts that are not a flat key and value. The file is only
+# replaced when jq succeeded: an empty result moved over the state file
+# would erase every fact about the installation, including which license
+# terms the operator accepted.
+state_apply() {
+    local filter="$1"; shift
     state_init
     local tmp; tmp="$(mktemp "${FILE_STATE}.XXXXXX")"
-    if [[ "$raw" == "--raw" ]]; then
-        jq --arg k "$key" --argjson v "$value" '.[$k] = $v | .updated_at = (now | todate)' \
-            "$FILE_STATE" >"$tmp"
-    else
-        jq --arg k "$key" --arg v "$value" '.[$k] = $v | .updated_at = (now | todate)' \
-            "$FILE_STATE" >"$tmp"
+    if ! jq "$@" "$filter | .updated_at = (now | todate)" "$FILE_STATE" >"$tmp" \
+        || [[ ! -s "$tmp" ]]; then
+        rm -f "$tmp"
+        warn "Could not update $FILE_STATE"
+        return 1
     fi
     chmod 0640 "$tmp"
     mv -f "$tmp" "$FILE_STATE"

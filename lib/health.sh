@@ -39,6 +39,14 @@ status_report() {
         last_backup_age=$(( $(date +%s) - $(stat -c %Y "$f") ))
     fi
 
+    # true or false when the build ships license terms, null when it has
+    # none to accept.
+    local license="null" bans
+    if [[ -n "$(license_id "$DIR_SERVER")" ]]; then
+        license_accepted_for "$DIR_SERVER" && license="true" || license="false"
+    fi
+    bans="$(bans_count)"
+
     if is_json; then
         local state="offline"
         (( running )) && case "$phase" in
@@ -65,6 +73,11 @@ status_report() {
             --argjson backup_age "${last_backup_age:-0}" \
             --argjson password "$( [[ -n "$(cfg SERVER_PASSWORD)" ]] && echo true || echo false )" \
             --argjson update "$( update_marker_is_set && echo true || echo false )" \
+            --argjson license "$license" \
+            --arg bans "$bans" \
+            --arg exit_code "$( (( running )) || container_exitcode )" \
+            --argjson save_exists "$( campaign_exists "$(cfg SAVE_NAME)" && echo true || echo false )" \
+            --argjson campaigns "$(campaign_names | grep -c . || true)" \
             '{
                ok:true, status:$status, instance:$instance, server_label:$label,
                save_name:$save, campaign_date:$campaign, players:$players,
@@ -73,7 +86,10 @@ status_report() {
                game_port:$port, host_address:$address,
                password_set:$password, uptime_seconds:$uptime,
                last_backup:$backup, last_backup_age_seconds:$backup_age,
-               update_available:$update
+               update_available:$update, license_accepted:$license,
+               save_exists:$save_exists, campaigns:$campaigns,
+               banned_accounts:(if $bans == "invalid" then null else ($bans | tonumber) end),
+               last_exit_code:(if $exit_code == "" or $exit_code == "?" then null else ($exit_code | tonumber) end)
              }'
         return 0
     fi
@@ -97,11 +113,24 @@ status_report() {
         esac
         out_kv "Uptime" "$(human_duration "$uptime")"
     else
+        local code meaning
+        code="$(container_exitcode)"
+        meaning="$(exit_code_meaning "$code")"
         out_kv "Status" "OFFLINE" "$C_RED"
-        out_kv "Last exit" "$(container_exitcode)"
+        out_kv "Last exit" "${code}${meaning:+  ($meaning)}"
     fi
 
-    out_kv "Campaign" "$(cfg SAVE_NAME)$( [[ -n "$(pulse_time)" ]] && printf '  (%s)' "$(pulse_time)" )"
+    local campaign_note=""
+    if ! campaign_exists "$(cfg SAVE_NAME)"; then
+        if [[ "$(state_get new_world)" == "$(cfg SAVE_NAME)" ]]; then
+            campaign_note="  (new world, created on the next start)"
+        else
+            campaign_note="  (no save: the server will not start. See: coop campaign list)"
+        fi
+    elif [[ -n "$(pulse_time)" ]]; then
+        campaign_note="  ($(pulse_time))"
+    fi
+    out_kv "Campaign" "$(cfg SAVE_NAME)${campaign_note}"
     (( running )) && out_kv "Players" "$players$( [[ -n "$(pulse_field parties)" ]] && printf '  (%s parties)' "$(pulse_field parties)" )"
     out_kv "Connect to" "$(host_primary_address):$(cfg GAME_PORT)$( [[ -n "$(cfg SERVER_PASSWORD)" ]] && printf '  (password set)' || printf '  (no password)' )"
     out_kv "Install channel" "$( [[ "$(cfg INSTALL_CHANNEL)" == workshop ]] && printf 'Steam Workshop' || printf 'Custom build' )"
@@ -126,7 +155,19 @@ status_report() {
         out_kv "Last backup" "none" "$C_YEL"
     fi
     out_kv "Automatic backups" "$( cfg_bool BACKUP_ENABLED && printf 'enabled (%s)' "$(cfg BACKUP_SCHEDULE)" || printf 'disabled' )"
+    case "$bans" in
+        0) ;;
+        invalid) out_kv "Steam bans" "steam-bans.json is not valid JSON. See: coop doctor" "$C_YEL" ;;
+        *)       out_kv "Steam bans" "$bans account(s). List them: coop ban" ;;
+    esac
 
+    # Only while it is down: a server that runs has had its terms accepted
+    # one way or another, even if not through this manager.
+    if [[ "$license" == "false" ]] && (( ! running )); then
+        out_line ""
+        out_line "  ${C_YEL}The license terms of this build have not been accepted${C_OFF}, so the"
+        out_line "  server will not start. See: coop eula"
+    fi
     if update_marker_is_set; then
         out_line ""
         out_line "  ${C_YEL}A Workshop update is available${C_OFF}. Install it with: coop update"
@@ -317,15 +358,19 @@ _doctor_data() {
         fi
     fi
 
-    local save
-    save="$DIR_SAVES/$(cfg SAVE_NAME).sav"
-    if [[ -f "$save" ]]; then
-        _hc ok "Data" "Campaign save" "$(cfg SAVE_NAME) ($(human_size_simple "$(stat -c %s "$save")"))"
+    local save name
+    name="$(campaign_resolve "$(cfg SAVE_NAME)")"
+    save="$DIR_SAVES/${name}.sav"
+    if [[ -n "$name" ]]; then
+        _hc ok "Data" "Campaign save" "$name ($(human_size_simple "$(stat -c %s "$save")"))"
         [[ -f "${save%.sav}.json" ]] \
-            || _hc warn "Data" "Campaign metadata" "$(cfg SAVE_NAME).json is missing beside the save"
+            || _hc warn "Data" "Player data" "$name.json is missing beside the save, so returning players start at character creation"
+    elif [[ "$(state_get new_world)" == "$(cfg SAVE_NAME)" ]]; then
+        _hc ok "Data" "Campaign save" "'$(cfg SAVE_NAME)' is a new world, created on the next start"
     else
-        _hc warn "Data" "Campaign save" "no save named '$(cfg SAVE_NAME)' yet, so a new world is created on first start"
+        _hc fail "Data" "Campaign save" "no save named '$(cfg SAVE_NAME)', and no new world was asked for, so the server will not start. See: coop campaign list"
     fi
+    _hc ok "Data" "Campaigns" "$(campaign_names | grep -c . || true) in $DIR_SAVES. List them: coop campaign list"
 
     if [[ -f "$FILE_MOD_JSON" ]]; then
         _hc ok "Data" "Gameplay config" "mod-config.json present"
@@ -365,6 +410,27 @@ _doctor_server() {
     else
         _hc fail "Server" "Server files" "BannerlordCoopServer.exe not found in $DIR_SERVER"
     fi
+
+    if server_installed; then
+        local id acc
+        id="$(license_id "$DIR_SERVER")"
+        acc="$(license_acceptance "$id")"
+        if [[ -z "$id" ]]; then
+            _hc ok "Server" "License terms" "none shipped with this build"
+        elif [[ -n "$acc" ]]; then
+            _hc ok "Server" "License terms" "accepted $(jq -r '"\(.accepted_at) by \(.accepted_by)"' <<<"$acc")"
+        elif container_running; then
+            _hc warn "Server" "License terms" "not accepted through coop, though the server runs. Record it: coop eula accept"
+        else
+            _hc fail "Server" "License terms" "not accepted, so the server will not start. See: coop eula"
+        fi
+    fi
+
+    case "$(bans_count)" in
+        0)       _hc ok   "Server" "Steam bans" "nobody banned" ;;
+        invalid) _hc fail "Server" "Steam bans" "$FILE_BANS is not valid JSON; the server keeps its last valid list" ;;
+        *)       _hc ok   "Server" "Steam bans" "$(bans_count) account(s) banned" ;;
+    esac
 
     if ! container_exists; then
         _hc warn "Server" "Container" "not created yet"

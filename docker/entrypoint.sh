@@ -81,8 +81,11 @@ log "server process ended, exit code $CODE"
 #   2  load error or timeout
 #   3  runtime failure
 #   4  module verification failed - files under Modules/Coop were modified
+#   6  the license terms of this build have not been accepted
 case "$CODE" in
     4) log "exit 4 means the Coop assemblies do not match the release." \
            "Run 'coop update --force' or 'coop rollback' on the host." ;;
+    6) log "exit 6 means the license terms of this build have not been accepted." \
+           "Run 'coop eula' on the host." ;;
 esac
 exit "$CODE"

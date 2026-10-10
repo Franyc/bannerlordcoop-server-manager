@@ -42,8 +42,24 @@ provision_collect_default() {
     out_line "  name already exists it is loaded; otherwise a new world is created."
     out_line ""
 
-    ask value "Campaign name" "$(cfg SAVE_NAME)"
+    local previous; previous="$(cfg SAVE_NAME)"
+    ask value "Campaign name" "$previous"
     cfg_set SAVE_NAME "$value"
+
+    # On an existing installation a name with no campaign behind it is
+    # either a typo or a new world, and only the operator knows which.
+    # (On a first installation a new world is the point.)
+    if installation_present && [[ "$value" != "$previous" ]]; then
+        local resolved; resolved="$(campaign_resolve "$value")"
+        if [[ -n "$resolved" ]]; then
+            cfg_set SAVE_NAME "$resolved"
+        elif confirm "There is no campaign named '$value'. Start a new world under that name?" no; then
+            CAMPAIGN_NEW_WORLD_OK=1
+        else
+            cfg_set SAVE_NAME "$previous"
+            log "Keeping '$previous'. The campaigns there are: coop campaign list"
+        fi
+    fi
 
     # At install time an empty answer means "no password". When one is
     # already set - reconfiguring, or a second pass - an empty answer means
@@ -215,7 +231,8 @@ provision_summary() {
     # Shared with `coop config`, where nothing is fetched. Only say it
     # when it is going to happen.
     if ! server_installed; then
-        out_line "  About 6 GB will be downloaded from Steam."
+        out_line "  About 6 GB will be downloaded from Steam. The Coop server's own"
+        out_line "  license terms come with it and are put to you before it first starts."
         out_line ""
     fi
 }

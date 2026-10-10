@@ -21,7 +21,7 @@ jobs:
 
       - name: Check syntax
         run: |
-          for f in bin/coop install.sh lib/*.sh docker/entrypoint.sh; do
+          for f in bin/coop install.sh lib/*.sh docker/entrypoint.sh tests/unit.sh tools/*.sh; do
             bash -n "$f" || exit 1
           done
           sh -n docker/coop-cmd
@@ -30,7 +30,7 @@ jobs:
       - name: ShellCheck
         run: |
           shellcheck --shell=bash --severity=warning \
-            bin/coop install.sh lib/*.sh docker/entrypoint.sh
+            bin/coop install.sh lib/*.sh docker/entrypoint.sh tests/unit.sh
           shellcheck --shell=sh --severity=warning \
             docker/coop-cmd docker/healthcheck.sh
 
@@ -115,7 +115,7 @@ jobs:
           COOP_ROOT="$PWD" bash -c '
             set -euo pipefail
             COOP_ROOT="$PWD"
-            for m in common output config state docker server steam compat backup update; do
+            for m in common output config state docker server license bans campaign steam compat backup update; do
               . "lib/$m.sh"
             done
             config_load
@@ -137,7 +137,7 @@ jobs:
           COOP_ROOT="$PWD" bash -c '
             set -euo pipefail
             COOP_ROOT="$PWD"
-            for m in common output config state docker server steam compat backup update; do
+            for m in common output config state docker server license bans campaign steam compat backup update; do
               . "lib/$m.sh"
             done
             out=/tmp/merged.json; rep=/tmp/report.txt
@@ -160,6 +160,13 @@ jobs:
 
             echo "values carried over, new keys adopted, dropped keys gone, comments intact"
           '
+
+      # Gameplay settings across builds, license acceptance, the ban list
+      # and campaign switching. A mistake in any of them is silent until it
+      # costs somebody a campaign or accepts terms nobody read, so each
+      # check names the promise it holds the code to.
+      - name: Unit checks
+        run: bash tests/unit.sh
 
   docs:
     name: Documentation

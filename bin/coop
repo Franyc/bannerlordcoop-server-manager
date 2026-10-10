@@ -31,7 +31,7 @@ COOP_ROOT="$(cd "$(dirname "$_self")/.." && pwd)"
 readonly COOP_ROOT
 unset _self _link
 
-for _lib in common output config state docker server steam compat deps backup update provision health; do
+for _lib in common output config state docker server license bans campaign steam compat deps backup update provision health; do
     # shellcheck source=/dev/null
     . "${COOP_ROOT}/lib/${_lib}.sh" || { echo "coop: cannot load lib/${_lib}.sh" >&2; exit 1; }
 done
@@ -52,6 +52,9 @@ SETUP
       --default               Recommended defaults, three questions
       --advanced              Configure ports, paths, backups and updates
       --non-interactive       Never prompt; missing values are an error
+    eula                    Are the server's license terms accepted?
+    eula show               Read them
+    eula accept             Accept them, so the server can start
 
 RUNNING
     status                  Show what the server is doing
@@ -61,12 +64,24 @@ RUNNING
                             (status players save say kick help)
     logs [--follow] [-n N]  Show the server log
 
+CAMPAIGNS
+    campaign list           The campaigns in saves/, and which one is hosted
+    campaign use <name>     Host an existing campaign: backup, then switch
+    campaign new <name>     Start a new world, leaving the others alone
+
+PLAYERS
+    ban [list]              List banned Steam accounts
+    ban <steam64-id>        Ban a Steam account; no restart needed
+      --name "<hero name>"    Note who it was
+    unban <steam64-id>      Lift a ban
+
 CONFIGURATION
     config                  Edit common settings
       --advanced              Include the less common ones
       --list                  Show every setting, its value and default
       --get KEY               Print one value
-      --set KEY=VALUE         Change one value
+      --set KEY=VALUE         Change one value. SAVE_NAME must name an
+                              existing campaign unless --new-world is given
       --apply                 Regenerate files and restart if needed
 
 SOFTWARE
@@ -95,6 +110,8 @@ GLOBAL OPTIONS
     --json                  Machine-readable output where supported
     --non-interactive       Never prompt
     --yes                   Answer confirmations with yes
+    --accept-eula           Accept the server's license terms without a
+                            prompt. --yes never does; read them first.
     --quiet                 Only warnings and errors
     --verbose               Extra detail
     -h, --help              This text
@@ -105,7 +122,7 @@ See 'coop config --list' for the full set.
 
 EXIT CODES
     0 success   2 usage   10 configuration   20 dependency   30 Steam
-    40 runtime  50 health 60 backup/restore  70 locked
+    40 runtime  50 health 60 backup/restore  70 locked   80 license terms
 HELPTEXT
 }
 
@@ -127,6 +144,7 @@ while (( $# )); do
         --json)            OUTPUT_FORMAT="json"; shift ;;
         --non-interactive) NON_INTERACTIVE=1; shift ;;
         --yes|-y)          ASSUME_YES=1; shift ;;
+        --accept-eula)     ACCEPT_EULA=1; shift ;;
         --quiet|-q)        QUIET=1; shift ;;
         --verbose|-v)      VERBOSE=1; shift ;;
         --config)          CONFIG_FILE="${2:?--config needs a file}"; shift 2 ;;
@@ -191,7 +209,8 @@ require_installation() {
 
 # ------------------------------------------------------------- commands --
 cmd_install() {
-    local mode="" skip_download=0 arg
+    local mode="" skip_download=0 fresh=1 arg
+    installation_present && fresh=0
     for arg in "$@"; do
         case "$arg" in
             --default)  mode="default" ;;
@@ -214,7 +233,9 @@ cmd_install() {
         provision_existing_menu
         case "$EXISTING_CHOICE" in
             1) exec "$0" ${OUTPUT_FORMAT:+--json} update ;;
-            2) log "Repairing"; provision_run 1; server_start; provision_validate; exit $? ;;
+            2) log "Repairing"; provision_run 1
+               license_require "$DIR_SERVER" || exit "$EX_LICENSE"
+               server_start; provision_validate; exit $? ;;
             # Reconfiguring changes settings, not the build, so there is
             # nothing to fetch. provision_run downloads anyway if it finds
             # no server files - which is what happens if the directory or
@@ -318,9 +339,34 @@ cmd_install() {
     state_set setup_profile "$mode"
     _install_cli_symlink
 
+    # A fresh installation is the one place where a new world is the
+    # expected outcome rather than a possible typo. On a reconfigure it
+    # takes an explicit yes, which the collector asked for.
+    if ! campaign_exists "$(cfg SAVE_NAME)" && { (( fresh )) || (( CAMPAIGN_NEW_WORLD_OK )); }; then
+        campaign_allow_new_world "$(cfg SAVE_NAME)"
+    fi
+
     # ---- [8/8] start and validation --------------------------------------
     out_line ""
     out_line "[8/8] Starting the server"
+
+    # The license terms ship with the server files, so this is the first
+    # moment there is anything to read - and nothing has been started yet.
+    # Declining is not a failed installation: everything is in place, and
+    # the server waits for a decision.
+    if server_installed && ! license_require "$DIR_SERVER"; then
+        out_line ""
+        out_line "Installation complete, but the server was not started."
+        out_line ""
+        out_line "  The Coop server does not host a campaign until its license terms"
+        out_line "  have been accepted. Once you have read them:"
+        out_line ""
+        out_line "    coop eula accept"
+        out_line "    coop start"
+        out_line ""
+        exit "$EX_LICENSE"
+    fi
+
     if ! server_installed; then
         warn "No server files are installed, so there is nothing to start."
     elif container_running; then
@@ -379,15 +425,16 @@ _install_cli_symlink() {
 }
 
 cmd_config() {
-    local mode="" key value arg
+    local mode="" key value arg new_world=0
     for arg in "$@"; do
         case "$arg" in
-            --advanced) mode="advanced" ;;
-            --list)     mode="list" ;;
-            --apply)    mode="apply" ;;
-            --get)      mode="get" ;;
-            --set)      mode="set" ;;
-            --*)        fail "$EX_USAGE" "Unknown option for config: $arg" ;;
+            --advanced)  mode="advanced" ;;
+            --list)      mode="list" ;;
+            --apply)     mode="apply" ;;
+            --get)       mode="get" ;;
+            --set)       mode="set" ;;
+            --new-world) new_world=1 ;;
+            --*)         fail "$EX_USAGE" "Unknown option for config: $arg" ;;
             *)          [[ "$mode" == "get" || "$mode" == "set" ]] && value="$arg" ;;
         esac
     done
@@ -432,6 +479,7 @@ cmd_config() {
             key="${value%%=*}"
             require_installation; require_root
             cfg_set "$key" "${value#*=}"
+            [[ "$key" == "SAVE_NAME" ]] && _config_guard_save_name "$new_world"
             config_persist "$FILE_CONFIG" "$key"
             ok "$key = $( [[ "$key" == SERVER_PASSWORD ]] && printf '********' || cfg "$key" )"
             _config_apply_after_change "$key" ;;
@@ -449,8 +497,34 @@ cmd_config() {
             confirm "Save these settings?" yes || { log "Nothing was changed."; return 0; }
             mapfile -t _all_keys < <(config_keys)
             config_persist "$FILE_CONFIG" "${_all_keys[@]}"
+            (( CAMPAIGN_NEW_WORLD_OK )) && campaign_allow_new_world "$(cfg SAVE_NAME)"
             _config_apply_after_change "" --force ;;
     esac
+}
+
+# The command-line route to SAVE_NAME gets the same protection as
+# `coop campaign use`: a name with no campaign behind it is refused, unless
+# a new world is what was asked for. A name that differs only in case is
+# taken as the campaign it matches, spelled as it is on disk.
+_config_guard_save_name() {
+    local new_world="$1" wanted resolved
+    wanted="$(cfg SAVE_NAME)"
+    resolved="$(campaign_resolve "$wanted")"
+    if [[ -n "$resolved" ]]; then
+        [[ "$resolved" != "$wanted" ]] && cfg_set SAVE_NAME "$resolved"
+        log "Tip: 'coop campaign use' does the same, with a backup and the restart included."
+        return 0
+    fi
+    if (( new_world )); then
+        campaign_allow_new_world "$wanted"
+        log "A new world named '$wanted' is created when the server next starts."
+        return 0
+    fi
+    fail "$EX_CONFIG" \
+        "There is no campaign named '$wanted' in $DIR_SAVES. Nothing was changed." \
+        "See the campaigns there are:   coop campaign list" \
+        "To start a new world instead:  coop campaign new \"$wanted\"" \
+        "                           or: coop config --set SAVE_NAME=\"$wanted\" --new-world"
 }
 
 # Regenerates what the server actually reads, and offers a restart only
@@ -468,6 +542,12 @@ _config_apply_after_change() {
     (( needs_restart )) || return 0
     container_running || return 0
 
+    # Without a terminal there is nobody to ask, and the setting is saved
+    # either way. Failing here reported a successful change as an error.
+    if (( ! ASSUME_YES )) && ! is_interactive; then
+        log "Restart for the change to take effect: coop restart"
+        return 0
+    fi
     if confirm "The server must restart for this to take effect. Restart now?" yes; then
         server_stop && server_start
     else
@@ -558,6 +638,83 @@ cmd_logs() {
     fi
 }
 
+cmd_eula() {
+    local sub="${1:-status}"
+    [[ $# -gt 0 ]] && shift
+    require_installation
+    server_installed || fail "$EX_RUNTIME" \
+        "No server files are installed, so there are no license terms to show." \
+        "Install them with: coop update --force"
+
+    case "$sub" in
+        status) license_status_report ;;
+        show)   license_show "$DIR_SERVER" ;;
+        accept)
+            require_root
+            local id; id="$(license_id "$DIR_SERVER")"
+            if [[ -z "$id" ]]; then
+                log "The installed build ships no license terms; there is nothing to accept."
+                return 0
+            fi
+            if license_is_accepted "$id"; then
+                ok "These license terms were already accepted ($(license_acceptance "$id" | jq -r .accepted_at))."
+                return 0
+            fi
+            license_require "$DIR_SERVER" || exit "$EX_LICENSE"
+            if ! container_running; then
+                out_line ""
+                out_line "  Start the server with: coop start"
+                out_line ""
+            fi ;;
+        *) fail "$EX_USAGE" "Unknown eula subcommand: $sub" "Use: coop eula [status|show|accept]" ;;
+    esac
+}
+
+# coop campaign [list] | use <name> | new <name>
+cmd_campaign() {
+    local sub="${1:-list}"
+    [[ $# -gt 0 ]] && shift
+    require_installation
+    case "$sub" in
+        list) campaign_list ;;
+        use|new)
+            (( $# <= 1 )) || fail "$EX_USAGE" \
+                "Too many arguments. A name with spaces needs quotes:" \
+                "  coop campaign $sub \"$*\""
+            require_root; acquire_lock "campaign $sub"
+            if [[ "$sub" == "use" ]]; then campaign_use "${1:-}"; else campaign_new "${1:-}"; fi ;;
+        *) fail "$EX_USAGE" "Unknown campaign subcommand: $sub" \
+               "Use: coop campaign [list | use \"<name>\" | new \"<name>\"]" ;;
+    esac
+}
+
+# coop ban [list] | coop ban <steam64-id> [--name "<hero name>"]
+cmd_ban() {
+    require_installation
+    local id="${1:-list}" name=""
+    [[ $# -gt 0 ]] && shift
+    if [[ "$id" == "list" ]]; then
+        ban_list
+        return
+    fi
+    while (( $# )); do
+        case "$1" in
+            --name)   name="${2:-}"; shift 2 ;;
+            --name=*) name="${1#--name=}"; shift ;;
+            *) fail "$EX_USAGE" "Unknown option for ban: $1" "Usage: coop ban <steam64-id> [--name \"<hero name>\"]" ;;
+        esac
+    done
+    require_root
+    ban_add "$id" "$name"
+}
+
+cmd_unban() {
+    require_installation
+    [[ -n "${1:-}" ]] || fail "$EX_USAGE" "Usage: coop unban <steam64-id>"
+    require_root
+    ban_remove "$1"
+}
+
 cmd_version() {
     if is_json; then
         jq -n --arg m "$MANAGER_VERSION" --arg c "$(server_version)" \
@@ -575,10 +732,10 @@ cmd_version() {
 case "$COOP_COMMAND" in
     install)     cmd_install "$@" ;;
     status)      require_installation; status_report ;;
-    start)       require_installation; require_root; acquire_lock start; server_start || exit "$EX_HEALTH" ;;
+    start)       require_installation; require_root; acquire_lock start; server_start_or_exit ;;
     stop)        require_installation; require_root; acquire_lock stop; server_stop ;;
     restart)     require_installation; require_root; acquire_lock restart
-                 server_stop; server_start || exit "$EX_HEALTH" ;;
+                 server_stop; server_start_or_exit ;;
     save)        require_installation; require_root; server_save || exit "$EX_RUNTIME" ;;
     console)     require_installation
                  (( $# )) || fail "$EX_USAGE" "Usage: coop console <command>   (try: coop console players)"
@@ -598,6 +755,11 @@ case "$COOP_COMMAND" in
     import-save) require_installation; require_root; acquire_lock import
                  backup_import_save "${1:?Usage: coop import-save <directory>}" ;;
     steam)       cmd_steam "$@" ;;
+    eula)        cmd_eula "$@" ;;
+    campaign)    cmd_campaign "$@" ;;
+    campaigns)   cmd_campaign list ;;
+    ban)         cmd_ban "$@" ;;
+    unban)       cmd_unban "$@" ;;
     doctor)      doctor_run ;;
     version)     cmd_version ;;
     help|-h|--help) usage ;;

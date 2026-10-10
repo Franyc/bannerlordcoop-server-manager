@@ -40,8 +40,12 @@ player_count() {
 player_list() { ds_event players | jq -r '.list[]? // empty' 2>/dev/null || true; }
 
 # The installed Coop build, read from the file the Workshop item ships.
-server_version() {
-    local f="$DIR_SERVER/release-info.txt" built game
+server_version() { server_version_of "$DIR_SERVER"; }
+
+# server_version_of <build-dir> - the same for any build on disk, such as
+# a download that has not been installed yet.
+server_version_of() {
+    local f="$1/release-info.txt" built game
     [[ -f "$f" ]] || { printf 'not installed'; return 0; }
     # The file ships with a Windows build and has CRLF line endings. A
     # trailing carriage return is invisible in a terminal but travels into
@@ -87,6 +91,13 @@ server_save() {
 }
 
 # ---------------------------------------------------------- start and stop --
+# The server's own words when its license terms have not been accepted.
+# Looked for only in output since <since> (a Unix time), so a refusal left
+# over from an earlier attempt cannot be mistaken for a new one.
+server_license_refused() {
+    docker logs --since "$1" "$CONTAINER_NAME" 2>&1 | grep -q 'EULA acceptance required'
+}
+
 # Waits until the server actually serves clients - not merely until the
 # container is up. Loading a grown campaign takes about two minutes.
 #
@@ -94,11 +105,19 @@ server_save() {
 #   1  timed out
 #   2  the container stopped on its own
 #   3  the container is crash looping
+#   4  the server refused to start: its license terms are not accepted
 wait_serving() {
-    local timeout="${1:-600}" waited=0 restarts_before restarts_now
+    local timeout="${1:-600}" since="${2:-}" waited=0 restarts_before restarts_now
     restarts_before="$(container_restart_count)"
 
     while (( waited < timeout )); do
+        # Checked before anything else. A server refusing its terms exits
+        # within seconds, and restart:unless-stopped starts it again and
+        # again, so at any given moment it may be between two attempts and
+        # look like a container that merely stopped.
+        if [[ -n "$since" ]] && server_license_refused "$since"; then
+            return 4
+        fi
         container_running || return 2
         server_is_serving && return 0
 
@@ -116,26 +135,52 @@ wait_serving() {
     return 1
 }
 
+#   0  serving        1  did not reach serving in time
+#   2  exited         4  refused: license terms not accepted
+#   5  not started: it would have created a world nobody asked for
 server_start() {
-    local timeout="${1:-600}"
+    local timeout="${1:-600}" since
     docker_require
     server_installed || fail "$EX_RUNTIME" \
         "No server files found in $DIR_SERVER." \
         "Install them first: coop update --force"
 
+    # A typo in SAVE_NAME must not quietly become a new, empty world that
+    # players then start playing in. See lib/campaign.sh.
+    if ! campaign_start_allowed; then
+        campaign_explain_refusal
+        return 5
+    fi
+
+    since="$(( $(date +%s) - 1 ))"
     log "Starting the server"
-    dc up -d --remove-orphans >/dev/null 2>&1 \
-        || { warn "docker compose up failed"; return 1; }
+    # DS_ACCEPT_EULA reaches the container only when it is set here (see
+    # compose.yaml), and it is set only for terms the operator accepted.
+    if license_accepted_for "$DIR_SERVER"; then
+        DS_ACCEPT_EULA=true dc up -d --remove-orphans >/dev/null 2>&1 \
+            || { warn "docker compose up failed"; return 1; }
+    else
+        dc up -d --remove-orphans >/dev/null 2>&1 \
+            || { warn "docker compose up failed"; return 1; }
+    fi
 
     local rc=0
-    wait_serving "$timeout" || rc=$?
+    wait_serving "$timeout" "$since" || rc=$?
     case "$rc" in
         0) # The campaign date comes from the pulse line, which has not
            # necessarily been printed yet the moment the server starts
            # serving - so it is appended only when there is one.
            local when; when="$(pulse_time)"
            ok "Server is serving ('$(cfg SAVE_NAME)'${when:+, $when})"
+           campaign_settle_new_world
            return 0 ;;
+        4) # Left alone, Docker would restart it into the same refusal
+           # for as long as the machine runs.
+           dc stop >/dev/null 2>&1 || true
+           warn "The server will not start: its license terms have not been accepted."
+           out_line "    Read them:  coop eula show"
+           out_line "    Accept:     coop eula accept"
+           return 4 ;;
         3) # Mid-restart, the reported exit code is whatever Docker happened
            # to be holding, so it is not worth printing. The log is.
            warn "The server is not starting: the container exits at once and Docker keeps restarting it."
@@ -149,6 +194,18 @@ server_start() {
     esac
 }
 
+# For commands that end in a start: the exit code says why it failed.
+server_start_or_exit() {
+    local rc=0
+    server_start "$@" || rc=$?
+    case "$rc" in
+        0) return 0 ;;
+        4) exit "$EX_LICENSE" ;;
+        5) exit "$EX_CONFIG" ;;
+        *) exit "$EX_HEALTH" ;;
+    esac
+}
+
 # The server's own exit codes. Naming them turns a support question into a
 # one-line answer.
 _explain_exit_code() {
@@ -158,8 +215,22 @@ _explain_exit_code() {
         4) out_line "    Exit 4: the Coop assemblies do not match the release. Files under"
            out_line "            Modules/Coop were modified. Try 'coop update --force' or"
            out_line "            'coop rollback'." ;;
+        6) out_line "    Exit 6: the license terms of this build have not been accepted."
+           out_line "            See: coop eula" ;;
         137) out_line "    Exit 137: the container was killed. This should not happen with the"
              out_line "              console shutdown path; please report it." ;;
+    esac
+}
+
+# The same, in a few words, for status output.
+exit_code_meaning() {
+    case "${1:-}" in
+        0)   printf 'clean shutdown' ;;
+        2)   printf 'save could not be loaded' ;;
+        3)   printf 'failed while running' ;;
+        4)   printf 'Coop files modified' ;;
+        6)   printf 'license terms not accepted, see: coop eula' ;;
+        137) printf 'killed' ;;
     esac
 }
 

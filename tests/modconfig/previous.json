@@ -3,11 +3,15 @@
   "difficulty": {
     // Changed by the player from the shipped default.
     "playerReceivedDamage": "Realistic",
+    // Never touched: still the older build's default.
+    "birthAndDeath": false,
     // This setting no longer exists in the newer build.
     "goneInNewBuild": true,
   },
   "modOptions": {
     "battleSize": 500,
     "enableHeroExecutions": false,
+    // Changed by the player. The newer build changes its default too.
+    "playerBattleAiJoinWindowHours": 12,
   },
 }

@@ -31,6 +31,19 @@ services:
     environment:
       TZ: ${COOP_TZ:-UTC}
 
+      # The server's license acceptance. Deliberately without a value:
+      # Compose then passes it only when it is set in the environment of
+      # `docker compose` itself, and coop sets it only when starting a build
+      # whose license terms the operator accepted (coop eula). Do not give
+      # it a value here; that would accept terms nobody has read, including
+      # those of every future build.
+      DS_ACCEPT_EULA:
+
+      # The Steam ban list. Left alone, the server looks inside server/,
+      # which every update replaces; config/ survives updates and is in
+      # every backup. Z: is how the Windows server sees the container's /.
+      COOP_STEAM_BAN_FILE: 'Z:\data\steam-bans.json'
+
     # The only port that has to be reachable from the internet. The Steam
     # game-server ports (UDP 27315/27316) are used locally only.
     #

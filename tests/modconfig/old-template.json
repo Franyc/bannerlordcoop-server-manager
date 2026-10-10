@@ -1,0 +1,13 @@
+{
+  // What the older Coop build shipped, before the player changed anything.
+  "difficulty": {
+    "playerReceivedDamage": "VeryEasy",
+    "birthAndDeath": false,
+    "goneInNewBuild": true,
+  },
+  "modOptions": {
+    "battleSize": 1000,
+    "enableHeroExecutions": true,
+    "playerBattleAiJoinWindowHours": 24,
+  },
+}

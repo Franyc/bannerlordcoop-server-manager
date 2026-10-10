@@ -21,12 +21,16 @@ readonly EX_RUNTIME=40           # container or server process failure
 readonly EX_HEALTH=50            # health check failed
 readonly EX_BACKUP=60            # backup or restore failed
 readonly EX_LOCKED=70            # another operation holds the lock
+readonly EX_LICENSE=80           # the server's license terms have not been accepted
 readonly EX_UPDATE_AVAILABLE=100 # only with `update --check --exit-status`
 
 # ------------------------------------------------------------------ globals --
 # Set by bin/coop from the command line before anything else runs.
 : "${NON_INTERACTIVE:=0}"
 : "${ASSUME_YES:=0}"
+# Set only by --accept-eula. Deliberately separate from --yes: a flag that
+# confirms an operation is not consent to a license.
+: "${ACCEPT_EULA:=0}"
 : "${QUIET:=0}"
 : "${VERBOSE:=0}"
 : "${OUTPUT_FORMAT:=human}"
