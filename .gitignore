@@ -1,4 +1,4 @@
-# --- Secrets und Zugangsdaten -------------------------------------------
+# --- Secrets and credentials ----------------------------------------------
 .env
 .env.*
 !.env.example
@@ -9,7 +9,7 @@ id_ed25519*
 credentials*
 secrets*
 
-# --- Spieldaten (gehoeren nie ins Repo) ---------------------------------
+# --- Game data (never belongs in the repository) -------------------------
 *.sav
 Game Saves/
 saves/
@@ -19,23 +19,23 @@ server/
 rollback/
 steamcmd/
 
-# --- Backups und Archive ------------------------------------------------
+# --- Backups and archives -------------------------------------------------
 backups/
 *.tar.gz
 *.tgz
 *.zip
 *.7z
 
-# --- Logs ---------------------------------------------------------------
+# --- Logs -----------------------------------------------------------------
 logs/
 *.log
 
-# --- Scratch / Zwischenstaende ------------------------------------------
+# --- Scratch --------------------------------------------------------------
 tmp/
 scratch/
 .cache/
 
-# --- OS und Editoren ----------------------------------------------------
+# --- Operating systems and editors ----------------------------------------
 Thumbs.db
 desktop.ini
 .DS_Store

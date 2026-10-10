@@ -1,8 +1,8 @@
-# Standard: Git entscheidet, Zeilenenden im Repo immer LF
+# Default: Git decides what is text, and text is always LF in the repository
 * text=auto eol=lf
 
-# Alles, was auf dem Linux-Server laeuft, MUSS LF haben.
-# Sonst: "bad interpreter: /bin/bash^M"
+# Everything that runs on the Linux server MUST be LF. A CRLF checkout on
+# Windows otherwise ends in "bad interpreter: /bin/bash^M" on the server.
 *.sh          text eol=lf
 *.bash        text eol=lf
 Dockerfile*   text eol=lf
@@ -12,20 +12,20 @@ Dockerfile*   text eol=lf
 *.yaml        text eol=lf
 *.json        text eol=lf
 *.conf        text eol=lf
+*.svg         text eol=lf
 .env.example  text eol=lf
 
-# Scripts ohne Endung (z. B. scripts/calradia) einzeln nachtragen.
-
-# Windows-seitige Helfer duerfen CRLF haben
+# Windows-side helpers may keep CRLF
 *.ps1         text eol=crlf
 *.cmd         text eol=crlf
 *.bat         text eol=crlf
 
-# Binaeres nicht anfassen
+# Binary files are never touched
 *.png binary
 *.jpg binary
 *.gz  binary
 *.zip binary
+*.7z  binary
 *.sav binary
 
 # Scripts without a file extension
