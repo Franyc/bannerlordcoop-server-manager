@@ -61,7 +61,7 @@ sudo coop install --default --non-interactive --yes --accept-eula --save-name "C
 | Command | Root | Notes |
 |---|---|---|
 | `coop eula` | no | Does the installed build ship terms, and are they accepted? `--json`. |
-| `coop eula show` | no | Print them, through a pager on a terminal |
+| `coop eula show` | no | Print them. On a terminal they open in a pager: Space scrolls, `q` quits |
 | `coop eula accept` | yes | Accept them, after a question; `--accept-eula` skips the question |
 
 From Coop v0.1.6 on, the dedicated server ships with an EULA and a license

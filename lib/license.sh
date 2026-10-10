@@ -147,7 +147,7 @@ _license_offer_reading() {
     printf 'Read them now? [Y/n] ' >&2
     read -r reply || reply="n"
     reply="${reply,,}"
-    [[ -z "$reply" || "$reply" == "y" || "$reply" == "yes" ]] && license_show "$1"
+    [[ -z "$reply" || "$reply" == "y" || "$reply" == "yes" ]] && license_show "$1" "returns to the question"
     return 0
 }
 
@@ -161,9 +161,18 @@ _license_ask() {
     [[ "$reply" == "y" || "$reply" == "yes" ]]
 }
 
-# license_show <build-dir> - the documents, through a pager on a terminal.
+# license_show <build-dir> [<what q does>]
+#
+# The documents, through less on a terminal. less on its own gives no hint
+# how to leave it - its prompt is a bare colon - and somebody who has never
+# met it is stuck in the middle of a license with a question waiting
+# behind it. So the prompt line says how, the whole time, and -e lets
+# Space at the end leave as well.
+#
+# <what q does> becomes part of that prompt, where '.', ':', '?', '%' and
+# '\' have a meaning of their own: it must contain none of them.
 license_show() {
-    local docs=() doc
+    local leave="${2:-quits}" docs=() doc
     mapfile -t docs < <(license_documents "$1")
     if (( ${#docs[@]} == 0 )); then
         out_line "This build ships no license terms."
@@ -175,7 +184,11 @@ license_show() {
             tr -d '\r' <"$doc"
             printf '\n'
         done
-    } | if [[ -t 1 ]] && command -v less >/dev/null 2>&1; then less; else cat; fi
+    } | if [[ -t 1 ]] && command -v less >/dev/null 2>&1; then
+            less -e -Ps"?eEnd of the terms - Space or q ${leave}:License terms - Space scrolls, q ${leave}."
+        else
+            cat
+        fi
 }
 
 # ------------------------------------------------------------------ report --

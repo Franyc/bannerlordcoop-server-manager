@@ -188,6 +188,10 @@ Read them now? [Y/n]
 Do you accept these license terms? [y/N]
 ```
 
+The terms open in a pager. Space scrolls, and `q` returns to the question,
+as does Space once you have reached the end. The bottom line says so the
+whole time.
+
 They are the Bannerlord Coop team's terms, not this installer's, and the
 installer never accepts them for you. Among other things they govern
 commercial hosting, which needs the team's written permission. If you
