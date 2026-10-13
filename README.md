@@ -421,13 +421,13 @@ The manager has its own version, separate from the Coop mod:
 
 ```
 $ coop version
-Bannerlord Coop Server Manager v0.2.1
+Bannerlord Coop Server Manager v0.2.2
 Installed Coop build:       build 2026-10-06 / Mount & Blade II: Bannerlord v1.4.8
 ```
 
 ## Status
 
-**v0.2.1.** Installed and exercised end to end on Ubuntu 26.04 and
+**v0.2.2.** Installed and exercised end to end on Ubuntu 26.04 and
 Debian 13:
 
 - install from nothing: dependency and Docker setup, Workshop download,
