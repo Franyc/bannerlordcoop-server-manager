@@ -93,7 +93,7 @@ done < <(config_keys)
 
 # -------------------------------------------------------------- paths --
 printf '\nGenerated and referenced files\n'
-for f in templates/server-config.json.tmpl config/defaults.env \
+for f in templates/server-config.json.tmpl templates/motd/bannerlordcoop.sh.tmpl config/defaults.env \
          templates/systemd/bannerlordcoop-backup@.service \
          templates/systemd/bannerlordcoop-backup@.timer \
          templates/systemd/bannerlordcoop-update-check@.service \

@@ -53,6 +53,8 @@ declare -gA CONFIG_SPEC=(
     [STEAM_ADVERTISE]="bool|yes|Advertise the server in a public Steam lobby when a logged-in Steam client runs on the host. Off means direct connect only."
     [SERVER_LOG_FILE]="bool|yes|Write the server's output to a file per launch in logs/, in addition to the container log."
 
+    [LOGIN_MESSAGE]="bool|no|Show this server's state in the message at an SSH login: a Workshop update waiting, and the last backup. Ubuntu and Debian only; elsewhere it does nothing."
+
     [TIMEZONE]="string|yes|Time zone inside the container. 'system' adopts the host's zone."
     [MEMORY_LIMIT]="string|yes|Memory limit for the container, e.g. 4g. Empty means no limit. Measured usage is 1.2-1.6 GB."
     [PUID]="int|yes|User ID owning the data directories and running the server process."
@@ -327,6 +329,16 @@ config_derive_paths() {
     COMPOSE_PROJECT="bannerlordcoop-${INSTANCE_ID}"
 
     log_open "$INSTALL_DIR"
+}
+
+# config_default <key> - the project default, straight from defaults.env,
+# whatever the installation has configured. For the few places that need
+# to know whether a value is the default one.
+config_default() {
+    local line
+    line="$(grep -m1 -E "^${1}=" "${COOP_ROOT}/config/defaults.env" 2>/dev/null)" || return 0
+    line="${line#*=}"; line="${line%\"}"; line="${line#\"}"
+    printf '%s' "$line"
 }
 
 # cfg <key> - the only supported way to read a setting.

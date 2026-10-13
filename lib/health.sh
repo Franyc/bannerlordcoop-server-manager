@@ -336,6 +336,16 @@ _doctor_configuration() {
     else
         _hc fail "Configuration" "server-config.json" "missing. Run: coop config --apply"
     fi
+
+    if [[ ! -d /etc/update-motd.d ]]; then
+        _hc info "Configuration" "Login message" "this host has no update-motd, so there is none"
+    elif ! cfg_bool LOGIN_MESSAGE; then
+        _hc info "Configuration" "Login message" "switched off (LOGIN_MESSAGE=false)"
+    elif [[ -x "$(motd_file)" ]]; then
+        _hc ok "Configuration" "Login message" "$(motd_file)"
+    else
+        _hc warn "Configuration" "Login message" "not installed. Run: coop config --apply"
+    fi
 }
 
 _doctor_data() {

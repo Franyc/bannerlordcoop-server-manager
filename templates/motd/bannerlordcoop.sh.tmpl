@@ -1,0 +1,29 @@
+#!/bin/sh
+# The state of a Bannerlord Coop server, shown at an SSH login next to the
+# pending package updates: a Workshop update waiting, the last backup, and
+# where to look.
+#
+# GENERATED FILE. coop writes it for one installation and rewrites it with
+# `coop config --apply`, so edits here are lost.
+#
+# Reads files only - no docker, no network - so a login stays fast. That
+# is also why it says nothing about whether the server is running.
+
+@@SETTINGS@@
+
+[ -d "$D/state" ] || exit 0
+
+printf '\n'
+if [ -f "$D/state/update-available" ]; then
+    printf ' \033[33m*\033[0m %s: \033[33ma Workshop update is available\033[0m  ->  %s update\n' "$TITLE" "$COOP"
+else
+    printf ' * %s\n' "$TITLE"
+fi
+
+LAST=$(ls -1t "$D"/backups/*.tar.gz 2>/dev/null | head -1)
+if [ -n "$LAST" ]; then
+    printf '   Last backup: %s (%s)\n' "$(basename "$LAST")" "$(date -r "$LAST" '+%Y-%m-%d %H:%M')"
+else
+    printf '   \033[33mNo backup yet\033[0m  ->  %s backup\n' "$COOP"
+fi
+printf '   Overview: %s status\n\n' "$COOP"

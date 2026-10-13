@@ -319,7 +319,8 @@ license terms, then stops the server cleanly, backs up, keeps a copy of the
 current build, installs, brings the gameplay settings up to the new build,
 starts, and **rolls back by itself if the new build will not serve**.
 
-A scheduled check runs nightly and only reports. Automatic installation is
+A scheduled check runs nightly and only reports, in `coop status` and in
+the message you see when you log in over SSH. Automatic installation is
 off by default on purpose: the server verifies its Coop assemblies and every
 player has to run the same build, so an unattended update would lock out
 anyone who has not updated their client. Turn it on with

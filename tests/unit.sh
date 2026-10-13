@@ -14,7 +14,7 @@ set -euo pipefail
 COOP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export COOP_ROOT
 cd "$COOP_ROOT"
-for m in common output config state docker server license bans campaign steam compat backup update; do
+for m in common output config state docker server license bans campaign steam compat backup update provision; do
     # shellcheck source=/dev/null
     . "lib/$m.sh"
 done
@@ -161,5 +161,30 @@ printf 'x' >"$DIR_SAVES/Alpah.sav"
 campaign_settle_new_world
 [[ -z "$(state_get new_world)" ]] || nok "a new world that exists is still marked as pending"
 pass "a missing save starts only when a new world was asked for"
+
+# --------------------------------------------------------- login message --
+# Rendered the way provision_install_motd renders it, then run with sh, as
+# update-motd would. A path with a quote and a space must survive.
+quirky="$T/it's a server"
+mkdir -p "$quirky/state" "$quirky/backups"
+settings="$(printf 'D=%s\nCOOP=%s\nTITLE=%s' "$(_sh_quote "$quirky")" \
+    "$(_sh_quote "coop --install-dir $quirky")" "$(_sh_quote "Bannerlord Coop (second)")")"
+COOP_M_SETTINGS="$settings" awk '$0 == "@@SETTINGS@@" { print ENVIRON["COOP_M_SETTINGS"]; next } { print }' \
+    templates/motd/bannerlordcoop.sh.tmpl >"$T/motd"
+
+out="$(sh "$T/motd")"
+grep -q "No backup yet" <<<"$out"                          || nok "a missing backup was not reported"
+grep -q "Overview: coop --install-dir $quirky status" <<<"$out" || nok "the overview command lost the installation's path"
+grep -q "Workshop update" <<<"$out"                        && nok "an update was reported without a marker"
+
+touch "$quirky/state/update-available" "$quirky/backups/auto-20261013-020252.tar.gz"
+out="$(sh "$T/motd")"
+grep -q "a Workshop update is available" <<<"$out"          || nok "the update marker was not reported"
+grep -q "Last backup: auto-20261013-020252.tar.gz" <<<"$out" || nok "the last backup was not reported"
+[[ -z "$(sh "$T/motd" 2>&1 >/dev/null)" ]]                  || nok "the login message wrote errors"
+
+rm -rf "$quirky"
+[[ -z "$(sh "$T/motd")" ]] || nok "a removed installation still produced a login message"
+pass "the login message reports the marker and the last backup, for any path"
 
 printf '\nAll unit checks passed.\n'

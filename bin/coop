@@ -534,6 +534,7 @@ _config_apply_after_change() {
     config_write_compose_env
     server_config_render
     provision_install_units
+    provision_install_motd
 
     local needs_restart=0
     if [[ "$force" == "--force" ]]; then needs_restart=1

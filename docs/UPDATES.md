@@ -171,7 +171,8 @@ coop config --set UPDATE_CHECK_SCHEDULE="*-*-* 04:00:00"
 coop config --set UPDATE_CHECK_ENABLED=false
 ```
 
-When an update is found, a marker is written and `coop status` shows it.
+When an update is found, a marker is written, and `coop status` and the
+message at an SSH login both show it. A successful `coop update` removes it.
 
 If Steam cannot be reached the service exits 30, which its unit file
 declares a success. An unreachable Steam API is weather, not a failure of

@@ -300,10 +300,55 @@ provision_run() {
         ok "$(server_version)"
     fi
 
-    step "Installing scheduled tasks"
+    step "Installing scheduled tasks and the login message"
     provision_install_units
+    provision_install_motd
 
     return 0
+}
+
+# ----------------------------------------------------------- login message --
+# A few lines about the server in the message shown at an SSH login, the
+# way update-motd already shows pending package updates. One file per
+# installation, with the installation's path written into it, so several
+# servers on one host each get their own lines and no registry of
+# instances is needed.
+motd_file() { printf '/etc/update-motd.d/95-bannerlordcoop-%s' "$INSTANCE_ID"; }
+
+# A value quoted for a POSIX shell script: ' becomes '\''.
+_sh_quote() { local v="$1" q="'"; printf "'%s'" "${v//$q/$q\\$q$q}"; }
+
+provision_install_motd() {
+    local target tmpl="${COOP_ROOT}/templates/motd/bannerlordcoop.sh.tmpl"
+    target="$(motd_file)"
+
+    # Ubuntu and Debian run these scripts at login. Elsewhere there is
+    # nowhere for the file to go, and nothing to do.
+    [[ -d /etc/update-motd.d ]] || return 0
+    if ! cfg_bool LOGIN_MESSAGE; then
+        rm -f "$target"
+        return 0
+    fi
+    [[ -f "$tmpl" ]] || { warn "Missing template: $tmpl"; return 0; }
+
+    # The default installation is found without being named; any other
+    # needs its directory on every command the message suggests.
+    local coop="coop" title="Bannerlord Coop" settings tmp
+    [[ "$INSTALL_DIR" == "$(config_default INSTALL_DIR)" ]] || coop="coop --install-dir $INSTALL_DIR"
+    [[ "$INSTANCE_ID" == "$(config_default INSTANCE_ID)" ]] || title="Bannerlord Coop ($INSTANCE_ID)"
+
+    settings="$(printf '# Switch it off with: %s config --set LOGIN_MESSAGE=false\nD=%s\nCOOP=%s\nTITLE=%s' \
+        "$coop" "$(_sh_quote "$INSTALL_DIR")" "$(_sh_quote "$coop")" "$(_sh_quote "$title")")"
+
+    # Written beside the target under a name with a dot in it, which
+    # run-parts skips, so a login at this moment never runs half a file.
+    tmp="$(mktemp "${target}.XXXXXX")" || { warn "Could not write $target"; return 0; }
+    COOP_M_SETTINGS="$settings" awk '
+        $0 == "@@SETTINGS@@" { print ENVIRON["COOP_M_SETTINGS"]; next }
+        { print }
+    ' "$tmpl" >"$tmp" && chmod 0755 "$tmp" && mv -f "$tmp" "$target" \
+        || { rm -f "$tmp"; warn "Could not write $target"; return 0; }
+    ok "Login message: $target"
 }
 
 # ---------------------------------------------------------------- systemd --

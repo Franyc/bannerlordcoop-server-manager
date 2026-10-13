@@ -93,6 +93,7 @@ session lives under `state/steam`. See [STEAM.md](STEAM.md).
 | `INSTALL_CHANNEL` | `workshop` | one of: workshop, custom | Install only | Where the server files come from. 'workshop' downloads from the Steam Workshop; 'custom' installs from a local directory. |
 | `INSTALL_DIR` | `/srv/bannerlordcoop` | path | Install only | Absolute path holding all persistent data for this installation. |
 | `INSTANCE_ID` | `default` | identifier | Install only | Identifier for this installation. Shapes the container, lock and systemd unit names, so one host can run more than one server. |
+| `LOGIN_MESSAGE` | `true` | bool | No | Show this server's state in the message at an SSH login: a Workshop update waiting, and the last backup. Ubuntu and Debian only; elsewhere it does nothing. |
 | `LOG_MAX_FILES` | `5` | int | No | Number of rotated container log files to keep. |
 | `LOG_MAX_SIZE` | `50m` | string | No | Maximum size of a single container log file before it rotates. |
 | `MEMORY_LIMIT` | _(empty)_ | string | Yes | Memory limit for the container, e.g. 4g. Empty means no limit. Measured usage is 1.2-1.6 GB. |
@@ -141,6 +142,23 @@ Names may contain spaces, up to 64 characters. They become file names for
 a Windows program, so `/ \ : * ? " < > |` are refused, as are names the
 server uses for itself (`default_new_game`, `coop_bug_report`,
 `TransferSave`, anything ending in `.backup1` or `.backup2`).
+
+### `LOGIN_MESSAGE`
+
+A few lines about the server in the message shown at an SSH login, next to
+the pending package updates:
+
+```
+ * Bannerlord Coop: a Workshop update is available  ->  coop update
+   Last backup: auto-20261013-020252.tar.gz (2026-10-13 02:02)
+   Overview: coop status
+```
+
+It is a script in `/etc/update-motd.d`, one per installation, that reads
+files only, so a login stays fast. It therefore cannot say whether the
+server is running; `coop status` can. Ubuntu and Debian run these scripts;
+other distributions have no such directory, and the setting does nothing
+there. `coop config --apply` writes or removes it.
 
 ### `SERVER_LABEL`
 
