@@ -1,0 +1,93 @@
+name: upstream watch
+
+# Once a week, compare this fork with PlodyIce/bannerlordcoop-server-manager.
+# When upstream has commits we do not, keep one open issue that lists them
+# and names the files both sides changed, which is where a merge will need
+# attention. When we are caught up, the issue is closed.
+#
+# Why an issue and not an automatic pull request: a branch pushed with the
+# workflow token cannot carry upstream changes to .github/workflows, and a
+# pull request opened with that token does not trigger CI. The merge itself
+# is done by hand, see FORK.md.
+
+on:
+  schedule:
+    - cron: "17 12 * * 1"   # Mondays, 09:17 in Argentina
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  UPSTREAM_URL: https://github.com/PlodyIce/bannerlordcoop-server-manager.git
+  UPSTREAM_BRANCH: main
+  LABEL: upstream-sync
+
+jobs:
+  compare:
+    name: Compare with upstream
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch upstream
+        run: git fetch --quiet "$UPSTREAM_URL" "$UPSTREAM_BRANCH:refs/remotes/upstream/$UPSTREAM_BRANCH"
+
+      - name: Open, update or close the sync issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          up="upstream/$UPSTREAM_BRANCH"
+          behind=$(git rev-list --count "HEAD..$up")
+          existing=$(gh issue list --state open --label "$LABEL" --json number --jq '.[0].number // empty')
+
+          if [ "$behind" -eq 0 ]; then
+            echo "Up to date with upstream."
+            if [ -n "$existing" ]; then
+              gh issue close "$existing" --comment "Caught up with upstream at $(git rev-parse --short "$up")."
+            fi
+            exit 0
+          fi
+
+          base=$(git merge-base HEAD "$up")
+          git diff --name-only "$base" "$up"   | sort -u > /tmp/theirs
+          git diff --name-only "$base" HEAD    | sort -u > /tmp/ours
+          comm -12 /tmp/theirs /tmp/ours > /tmp/both
+
+          {
+            echo "Upstream \`$UPSTREAM_BRANCH\` has **$behind** commit(s) this fork does not."
+            echo
+            echo "### Commits"
+            git log --no-merges --date=short --format='- `%h` %s (%ad)' "HEAD..$up"
+            echo
+            if [ -s /tmp/both ]; then
+              echo "### Changed on both sides (check these when merging)"
+              sed 's/^/- `/; s/$/`/' /tmp/both
+            else
+              echo "No file was changed on both sides, so the merge should be clean."
+            fi
+            echo
+            echo "### How to merge"
+            echo '```bash'
+            echo 'git checkout main && git pull'
+            echo 'git fetch upstream'
+            echo 'git checkout -b sync/upstream-$(date +%Y%m%d) && git merge upstream/main'
+            echo 'git push -u origin HEAD   # then open a pull request into main'
+            echo '```'
+            echo
+            echo "_Updated by the upstream-watch workflow, $(date -u +%Y-%m-%d)._"
+          } > body.md
+
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --body-file body.md
+            echo "Updated issue #$existing"
+          else
+            gh label create "$LABEL" --color 0E8A16 \
+              --description "Upstream has changes to merge" --force
+            gh issue create --title "Upstream has new commits to merge" \
+              --label "$LABEL" --body-file body.md
+          fi

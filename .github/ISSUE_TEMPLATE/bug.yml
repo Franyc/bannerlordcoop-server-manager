@@ -1,0 +1,20 @@
+name: Bug in the manager
+description: Something the coop command or the installer did wrong
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: status
+    attributes:
+      label: Output of `coop status --json`
+      render: json
+  - type: input
+    id: host
+    attributes:
+      label: Distribution and version
+      placeholder: "Ubuntu 24.04"

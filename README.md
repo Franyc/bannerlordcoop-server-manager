@@ -1,5 +1,12 @@
 # Bannerlord Coop Server
 
+> **This is a fork** of
+> [PlodyIce/bannerlordcoop-server-manager](https://github.com/PlodyIce/bannerlordcoop-server-manager)
+> that adds loading other Bannerlord mods alongside Coop. Mod support is
+> work in progress; until it lands, this behaves exactly like upstream.
+> See [FORK.md](FORK.md) for what changes, what never does, and how the
+> fork stays in step with upstream.
+
 Install and run a **Mount & Blade II: Bannerlord** co-op dedicated server on
 your own Linux machine, and manage it afterwards with a single command.
 

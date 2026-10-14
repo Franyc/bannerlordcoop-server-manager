@@ -1,0 +1,48 @@
+name: release
+
+# Push a tag that matches VERSION to publish a release:
+#
+#   echo 0.2.2-mods.1 > VERSION && git commit -am "Release 0.2.2-mods.1"
+#   git tag v0.2.2-mods.1 && git push origin main v0.2.2-mods.1
+#
+# The full lint suite runs first; nothing is published if it fails.
+# Versions containing -alpha, -beta or -rc are marked as pre-releases.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    uses: ./.github/workflows/lint.yml
+
+  release:
+    name: Publish
+    needs: checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag matches VERSION
+        run: |
+          want="v$(tr -d '[:space:]' < VERSION)"
+          if [ "$want" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match VERSION ($want)."
+            exit 1
+          fi
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          flags=()
+          case "$GITHUB_REF_NAME" in
+            *-alpha*|*-beta*|*-rc*) flags+=(--prerelease) ;;
+          esac
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" --generate-notes --verify-tag "${flags[@]}"

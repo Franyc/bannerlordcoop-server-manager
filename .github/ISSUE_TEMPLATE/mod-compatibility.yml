@@ -1,0 +1,43 @@
+name: Mod compatibility report
+description: A mod you tried on a coop server, and what happened
+title: "[mod] "
+labels: ["mod-compat"]
+body:
+  - type: input
+    id: mod
+    attributes:
+      label: Mod name and version
+      placeholder: "e.g. Diplomacy 1.2.13"
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: Where it comes from
+      description: Steam Workshop or Nexus link
+  - type: input
+    id: builds
+    attributes:
+      label: Coop build and game version
+      description: "`coop status` shows both"
+      placeholder: "Coop v0.1.7, Bannerlord v1.4.8"
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result
+      options:
+        - Works
+        - Works with problems
+        - Server does not start
+        - Players cannot join
+        - Desync or crash during play
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: What happened
+      description: Load order, other mods enabled, and the relevant part of `coop logs`
+      render: text
